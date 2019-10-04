@@ -11,7 +11,7 @@
 
 #include "vk_helper.h"
 
-#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, "vkdemo", __VA_ARGS__))
+#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, "VKDEMO", __VA_ARGS__))
 
 struct saved_state {
     float angle;

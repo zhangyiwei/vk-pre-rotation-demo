@@ -40,10 +40,7 @@ private:
     PFN_vkDestroyInstance mDestroyInstance = nullptr;
     PFN_vkEnumerateDeviceExtensionProperties mEnumerateDeviceExtensionProperties = nullptr;
     PFN_vkEnumeratePhysicalDevices mEnumeratePhysicalDevices = nullptr;
-    PFN_vkGetPhysicalDeviceFeatures2 mGetPhysicalDeviceFeatures2 = nullptr;
-    PFN_vkGetPhysicalDeviceImageFormatProperties2 mGetPhysicalDeviceImageFormatProperties2 = nullptr;
     PFN_vkGetPhysicalDeviceMemoryProperties mGetPhysicalDeviceMemoryProperties = nullptr;
-    PFN_vkGetPhysicalDeviceProperties mGetPhysicalDeviceProperties = nullptr;
     PFN_vkGetPhysicalDeviceSurfaceFormatsKHR mGetPhysicalDeviceSurfaceFormatsKHR = nullptr;
     PFN_vkGetPhysicalDeviceSurfaceSupportKHR mGetPhysicalDeviceSurfaceSupportKHR = nullptr;
     PFN_vkGetPhysicalDeviceQueueFamilyProperties mGetPhysicalDeviceQueueFamilyProperties = nullptr;
@@ -57,11 +54,9 @@ private:
     PFN_vkCmdEndRenderPass mCmdEndRenderPass = nullptr;
     PFN_vkCmdBindPipeline mCmdBindPipeline = nullptr;
     PFN_vkCmdDraw mCmdDraw = nullptr;
-    PFN_vkCmdPipelineBarrier mCmdPipelineBarrier = nullptr;
     PFN_vkCmdPushConstants mCmdPushConstants = nullptr;
     PFN_vkCreateBuffer mCreateBuffer = nullptr;
     PFN_vkCreateCommandPool mCreateCommandPool = nullptr;
-    PFN_vkCreateFence mCreateFence = nullptr;
     PFN_vkCreateFramebuffer mCreateFramebuffer = nullptr;
     PFN_vkCreateGraphicsPipelines mCreateGraphicsPipelines = nullptr;
     PFN_vkCreateImageView mCreateImageView = nullptr;
@@ -71,22 +66,15 @@ private:
     PFN_vkCreateShaderModule mCreateShaderModule = nullptr;
     PFN_vkDestroyCommandPool mDestroyCommandPool = nullptr;
     PFN_vkDestroyDevice mDestroyDevice = nullptr;
-    PFN_vkDestroyFence mDestroyFence = nullptr;
     PFN_vkDestroySemaphore mDestroySemaphore = nullptr;
     PFN_vkDestroyShaderModule mDestroyShaderModule = nullptr;
-    PFN_vkDeviceWaitIdle mDeviceWaitIdle = nullptr;
     PFN_vkEndCommandBuffer mEndCommandBuffer = nullptr;
     PFN_vkFreeCommandBuffers mFreeCommandBuffers = nullptr;
     PFN_vkGetBufferMemoryRequirements mGetBufferMemoryRequirements = nullptr;
     PFN_vkGetDeviceQueue mGetDeviceQueue = nullptr;
-    PFN_vkGetSemaphoreFdKHR mGetSemaphoreFdKHR = nullptr;
-    PFN_vkImportSemaphoreFdKHR mImportSemaphoreFdKHR = nullptr;
     PFN_vkQueuePresentKHR mQueuePresentKHR = nullptr;
     PFN_vkQueueSubmit mQueueSubmit = nullptr;
-    PFN_vkQueueWaitIdle mQueueWaitIdle = nullptr;
     PFN_vkResetCommandBuffer mResetCommandBuffer = nullptr;
-    PFN_vkResetFences mResetFences = nullptr;
-    PFN_vkWaitForFences mWaitForFences = nullptr;
 
     // Swapchain functions
     PFN_vkAcquireNextImageKHR mAcquireNextImageKHR = nullptr;

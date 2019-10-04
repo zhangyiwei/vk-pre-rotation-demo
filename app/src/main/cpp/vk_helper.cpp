@@ -3,10 +3,10 @@
 #include <unistd.h>
 
 #include <android/log.h>
+#include <glm/glm.hpp>
 
 #define LOG_TAG "VKDEMO"
 #define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define ASSERT(cond) if (!(cond)) { __android_log_assert(#cond, LOG_TAG, "Error: " #cond " at " __FILE__ ":%d", __LINE__); }
 
 #define GET_PROC(F) m##F = reinterpret_cast<PFN_vk##F>(vkGetInstanceProcAddr(VK_NULL_HANDLE, "vk" #F))
@@ -99,7 +99,6 @@ void vk_helper::createInstance() {
     GET_INST_PROC(CreateDevice);
     GET_INST_PROC(EnumerateDeviceExtensionProperties);
     GET_INST_PROC(EnumeratePhysicalDevices);
-    GET_INST_PROC(GetPhysicalDeviceProperties);
     GET_INST_PROC(GetPhysicalDeviceQueueFamilyProperties);
     GET_INST_PROC(CreateAndroidSurfaceKHR);
     GET_INST_PROC(GetPhysicalDeviceMemoryProperties);
@@ -766,7 +765,7 @@ void vk_helper::drawFrame() {
         ALOGD("Vulkan is not ready yet");
         return;
     }
-    
+
     VkSemaphore currentAcquireSemaphore = mFreeAcquireSemaphore;
     VkSemaphore currentRenderSemaphore = mFreeRenderSemaphore;
 
@@ -803,7 +802,7 @@ void vk_helper::drawFrame() {
             .pImageIndices = &index,
             .pResults = nullptr,
     };
-    VkResult ret = vkQueuePresentKHR(mQueue, &presentInfo);
+    VkResult ret = mQueuePresentKHR(mQueue, &presentInfo);
     ASSERT(ret == VK_SUCCESS || ret == VK_SUBOPTIMAL_KHR);
 
     mFreeAcquireSemaphore = mAcquireSemaphores[index];
