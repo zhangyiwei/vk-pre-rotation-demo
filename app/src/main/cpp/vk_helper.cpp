@@ -11,7 +11,7 @@
 
 #define GET_PROC(F) m##F = reinterpret_cast<PFN_vk##F>(vkGetInstanceProcAddr(VK_NULL_HANDLE, "vk" #F))
 #define GET_INST_PROC(F) m##F = reinterpret_cast<PFN_vk##F>(vkGetInstanceProcAddr(mInstance, "vk" #F))
-#define GET_DEV_PROC(F) m##F = reinterpret_cast<PFN_vk##F>(vkGetDeviceProcAddr(mDevice, "vk" #F))
+#define GET_DEV_PROC(F) m##F = reinterpret_cast<PFN_vk##F>(mGetDeviceProcAddr(mDevice, "vk" #F))
 
 static const char* kRequiredInstanceExtensions[] = {
         "VK_KHR_surface",
@@ -96,12 +96,15 @@ void vk_helper::createInstance() {
 
     ASSERT(mCreateInstance(&instanceInfo, nullptr, &mInstance) == VK_SUCCESS);
 
+    GET_INST_PROC(CreateAndroidSurfaceKHR);
     GET_INST_PROC(CreateDevice);
+    GET_INST_PROC(DestroyInstance);
+    GET_INST_PROC(DestroySurfaceKHR);
     GET_INST_PROC(EnumerateDeviceExtensionProperties);
     GET_INST_PROC(EnumeratePhysicalDevices);
-    GET_INST_PROC(GetPhysicalDeviceQueueFamilyProperties);
-    GET_INST_PROC(CreateAndroidSurfaceKHR);
+    GET_INST_PROC(GetDeviceProcAddr);
     GET_INST_PROC(GetPhysicalDeviceMemoryProperties);
+    GET_INST_PROC(GetPhysicalDeviceQueueFamilyProperties);
     GET_INST_PROC(GetPhysicalDeviceSurfaceFormatsKHR);
     GET_INST_PROC(GetPhysicalDeviceSurfaceSupportKHR);
     GET_INST_PROC(GetPhysicalDeviceSurfaceCapabilitiesKHR);
@@ -188,8 +191,21 @@ void vk_helper::createDevice() {
     GET_DEV_PROC(CreateSemaphore);
     GET_DEV_PROC(CreateShaderModule);
     GET_DEV_PROC(CreateSwapchainKHR);
+    GET_DEV_PROC(DestroyBuffer);
+    GET_DEV_PROC(DestroyCommandPool);
+    GET_DEV_PROC(DestroyDevice);
+    GET_DEV_PROC(DestroyFramebuffer);
+    GET_DEV_PROC(DestroyImageView);
+    GET_DEV_PROC(DestroyPipeline);
+    GET_DEV_PROC(DestroyPipelineLayout);
+    GET_DEV_PROC(DestroyRenderPass);
+    GET_DEV_PROC(DestroySemaphore);
     GET_DEV_PROC(DestroyShaderModule);
+    GET_DEV_PROC(DestroySwapchainKHR);
+    GET_DEV_PROC(DeviceWaitIdle);
     GET_DEV_PROC(EndCommandBuffer);
+    GET_DEV_PROC(FreeCommandBuffers);
+    GET_DEV_PROC(FreeMemory);
     GET_DEV_PROC(GetBufferMemoryRequirements);
     GET_DEV_PROC(GetDeviceQueue);
     GET_DEV_PROC(GetSwapchainImagesKHR);
@@ -811,5 +827,66 @@ void vk_helper::drawFrame() {
     mFreeRenderSemaphore = mRenderSemaphores[index];
     mRenderSemaphores[index] = currentRenderSemaphore;
 
-    ALOGD("Successfully draw a frame[SUBOPTIMAL(%u)]", ret == VK_SUBOPTIMAL_KHR);
+    //ALOGD("Successfully draw a frame[SUBOPTIMAL(%u)]", ret == VK_SUBOPTIMAL_KHR);
+}
+
+void vk_helper::destroy() {
+    if (mDevice != VK_NULL_HANDLE) {
+        mDeviceWaitIdle(mDevice);
+
+        for (auto& imageView : mImageViews) {
+            mDestroyImageView(mDevice, imageView, nullptr);
+        }
+        mImageViews.clear();
+
+        for (auto& framebuffer : mFramebuffers) {
+            mDestroyFramebuffer(mDevice, framebuffer, nullptr);
+        }
+        mFramebuffers.clear();
+
+        mDestroySemaphore(mDevice, mFreeAcquireSemaphore, nullptr);
+        mFreeAcquireSemaphore = VK_NULL_HANDLE;
+        for (auto& semaphore : mAcquireSemaphores) {
+            mDestroySemaphore(mDevice, semaphore, nullptr);
+        }
+
+        mDestroySemaphore(mDevice, mFreeRenderSemaphore, nullptr);
+        mFreeRenderSemaphore = VK_NULL_HANDLE;
+        for (auto& semaphore : mRenderSemaphores) {
+            mDestroySemaphore(mDevice, semaphore, nullptr);
+        }
+
+        if (!mCommandBuffers.empty()) {
+            mFreeCommandBuffers(mDevice, mCommandPool, mCommandBuffers.size(), mCommandBuffers.data());
+        }
+        mCommandBuffers.clear();
+        mDestroyCommandPool(mDevice, mCommandPool, nullptr);
+        mCommandPool = VK_NULL_HANDLE;
+
+        mDestroyBuffer(mDevice, mVertexBuffer, nullptr);
+        mVertexBuffer = VK_NULL_HANDLE;
+        mFreeMemory(mDevice, mDeviceMemory, nullptr);
+        mDeviceMemory = VK_NULL_HANDLE;
+
+        mDestroyPipeline(mDevice, mPipeline, nullptr);
+        mPipeline = VK_NULL_HANDLE;
+        mDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
+        mPipelineLayout = VK_NULL_HANDLE;
+
+        mDestroyRenderPass(mDevice, mRenderPass, nullptr);
+        mRenderPass = VK_NULL_HANDLE;
+
+        mDestroySwapchainKHR(mDevice, mSwapchain, nullptr);
+
+        mDestroyDevice(mDevice, nullptr);
+        mDevice = VK_NULL_HANDLE;
+    }
+
+    if (mInstance) {
+        mDestroySurfaceKHR(mInstance, mSurface, nullptr);
+        mSurface = VK_NULL_HANDLE;
+
+        mDestroyInstance(mInstance, nullptr);
+        mInstance = VK_NULL_HANDLE;
+    }
 }

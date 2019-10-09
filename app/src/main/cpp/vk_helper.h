@@ -11,6 +11,7 @@ public:
     explicit vk_helper() { mIsReady.store(false); }
     void initialize(ANativeWindow* window, AAssetManager* assetManager);
     void drawFrame();
+    void destroy();
 
 private:
     void createInstance();
@@ -38,14 +39,18 @@ private:
     PFN_vkCreateAndroidSurfaceKHR mCreateAndroidSurfaceKHR = nullptr;
     PFN_vkCreateDevice mCreateDevice = nullptr;
     PFN_vkDestroyInstance mDestroyInstance = nullptr;
+    PFN_vkDestroySurfaceKHR mDestroySurfaceKHR = nullptr;
     PFN_vkEnumerateDeviceExtensionProperties mEnumerateDeviceExtensionProperties = nullptr;
     PFN_vkEnumeratePhysicalDevices mEnumeratePhysicalDevices = nullptr;
+    PFN_vkGetDeviceProcAddr mGetDeviceProcAddr = nullptr;
     PFN_vkGetPhysicalDeviceMemoryProperties mGetPhysicalDeviceMemoryProperties = nullptr;
+    PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR mGetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
     PFN_vkGetPhysicalDeviceSurfaceFormatsKHR mGetPhysicalDeviceSurfaceFormatsKHR = nullptr;
     PFN_vkGetPhysicalDeviceSurfaceSupportKHR mGetPhysicalDeviceSurfaceSupportKHR = nullptr;
     PFN_vkGetPhysicalDeviceQueueFamilyProperties mGetPhysicalDeviceQueueFamilyProperties = nullptr;
 
     // GET_DEVICE_PROC functions
+    PFN_vkAcquireNextImageKHR mAcquireNextImageKHR = nullptr;
     PFN_vkAllocateCommandBuffers mAllocateCommandBuffers = nullptr;
     PFN_vkAllocateMemory mAllocateMemory = nullptr;
     PFN_vkBeginCommandBuffer mBeginCommandBuffer = nullptr;
@@ -64,23 +69,27 @@ private:
     PFN_vkCreateRenderPass mCreateRenderPass = nullptr;
     PFN_vkCreateSemaphore mCreateSemaphore = nullptr;
     PFN_vkCreateShaderModule mCreateShaderModule = nullptr;
+    PFN_vkCreateSwapchainKHR mCreateSwapchainKHR = nullptr;
+    PFN_vkDestroyBuffer mDestroyBuffer = nullptr;
     PFN_vkDestroyCommandPool mDestroyCommandPool = nullptr;
     PFN_vkDestroyDevice mDestroyDevice = nullptr;
+    PFN_vkDestroyFramebuffer mDestroyFramebuffer = nullptr;
+    PFN_vkDestroyImageView mDestroyImageView = nullptr;
+    PFN_vkDestroyPipeline mDestroyPipeline = nullptr;
+    PFN_vkDestroyPipelineLayout mDestroyPipelineLayout = nullptr;
+    PFN_vkDestroyRenderPass mDestroyRenderPass = nullptr;
     PFN_vkDestroySemaphore mDestroySemaphore = nullptr;
     PFN_vkDestroyShaderModule mDestroyShaderModule = nullptr;
+    PFN_vkDestroySwapchainKHR mDestroySwapchainKHR = nullptr;
     PFN_vkEndCommandBuffer mEndCommandBuffer = nullptr;
     PFN_vkFreeCommandBuffers mFreeCommandBuffers = nullptr;
+    PFN_vkFreeMemory mFreeMemory = nullptr;
     PFN_vkGetBufferMemoryRequirements mGetBufferMemoryRequirements = nullptr;
     PFN_vkGetDeviceQueue mGetDeviceQueue = nullptr;
+    PFN_vkGetSwapchainImagesKHR mGetSwapchainImagesKHR = nullptr;
     PFN_vkQueuePresentKHR mQueuePresentKHR = nullptr;
     PFN_vkQueueSubmit mQueueSubmit = nullptr;
-    PFN_vkResetCommandBuffer mResetCommandBuffer = nullptr;
-
-    // Swapchain functions
-    PFN_vkAcquireNextImageKHR mAcquireNextImageKHR = nullptr;
-    PFN_vkCreateSwapchainKHR mCreateSwapchainKHR = nullptr;
-    PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR mGetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
-    PFN_vkGetSwapchainImagesKHR mGetSwapchainImagesKHR = nullptr;
+    PFN_vkDeviceWaitIdle mDeviceWaitIdle = nullptr;
 
     // Members need to be tracked
     VkInstance mInstance = VK_NULL_HANDLE;

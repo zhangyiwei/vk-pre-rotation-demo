@@ -5,7 +5,7 @@
 
 #include "vk_helper.h"
 
-#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, "VKDEMO", __VA_ARGS__))
+#define ALOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, "VKDEMO", __VA_ARGS__))
 
 struct State {
     float angle;
@@ -24,15 +24,21 @@ struct Engine {
     Engine(): app(nullptr), animating(0), state(), vk() {}
 };
 
+static void engine_init_display(struct Engine* engine) {
+    ALOGD("engine_init_display");
+    engine->vk.initialize(engine->app->window, engine->app->activity->assetManager);}
+
 static void engine_draw_frame(struct Engine* engine) {
     engine->vk.drawFrame();
 }
 
 static void engine_term_display(struct Engine* engine) {
-    (void)engine;
+    ALOGD("engine_term_display");
+    engine->vk.destroy();
 }
 
 static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) {
+    ALOGD("engine_handle_input");
     auto engine = static_cast<Engine*>(app->userData);
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
         engine->animating = 1;
@@ -47,53 +53,50 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
     auto engine = static_cast<Engine*>(app->userData);
     switch (cmd) {
         case APP_CMD_SAVE_STATE:
-            LOGD("HAHA: SAVE_STATE");
+            ALOGD("HAHA: SAVE_STATE");
             // The system has asked us to save our current state.  Do so.
             engine->app->savedState = malloc(sizeof(struct State));
             *((struct State*)engine->app->savedState) = engine->state;
             engine->app->savedStateSize = sizeof(struct State);
             break;
         case APP_CMD_INIT_WINDOW:
-            LOGD("HAHA: INIT_WINDOW");
-            engine->vk.initialize(engine->app->window, app->activity->assetManager);
-            engine_draw_frame(engine);
+            engine_init_display(engine);
             break;
         case APP_CMD_TERM_WINDOW:
             // The window is being hidden or closed, clean it up.
             engine_term_display(engine);
             break;
         case APP_CMD_CONTENT_RECT_CHANGED:
-            LOGD("HAHA: RECT_CHANGED");
+            ALOGD("HAHA: RECT_CHANGED");
             break;
         case APP_CMD_CONFIG_CHANGED:
-            LOGD("HAHA: CONFIG_CHANGED");
+            ALOGD("HAHA: CONFIG_CHANGED");
             break;
         case APP_CMD_WINDOW_RESIZED:
-            LOGD("HAHA: WINDOW_RESIZED");
+            ALOGD("HAHA: WINDOW_RESIZED");
             break;
         case APP_CMD_INPUT_CHANGED:
-            LOGD("HAHA: INPUT_CHANGED");
+            ALOGD("HAHA: INPUT_CHANGED");
             break;
         case APP_CMD_WINDOW_REDRAW_NEEDED:
-            LOGD("HAHA: WINDOW_REDRAW_NEEDED");
+            ALOGD("HAHA: WINDOW_REDRAW_NEEDED");
             break;
         case APP_CMD_GAINED_FOCUS:
-            LOGD("HAHA: GAINED_FOCUS");
+            ALOGD("HAHA: GAINED_FOCUS");
             break;
         case APP_CMD_LOST_FOCUS:
-            LOGD("HAHA: LOST_FOCUS");
+            ALOGD("HAHA: LOST_FOCUS");
             // Stop animating.
             engine->animating = 0;
-            engine_draw_frame(engine);
             break;
         default:
-            LOGD("HAHA: UNKNOWN CMD[%d]", cmd);
+            ALOGD("HAHA: UNKNOWN CMD[%d]", cmd);
             break;
     }
 }
 
 static void on_window_resized(ANativeActivity *activity, ANativeWindow *window) {
-    LOGD("HAHA: onNativeWindowResized");
+    ALOGD("HAHA: onNativeWindowResized");
     (void)activity;
     (void)window;
 }
