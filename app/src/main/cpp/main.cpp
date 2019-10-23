@@ -1,7 +1,6 @@
-#include <jni.h>
-
 #include <android/log.h>
 #include <android_native_app_glue.h>
+#include <jni.h>
 
 #include "vk_helper.h"
 
@@ -12,7 +11,7 @@ struct State {
     int32_t x;
     int32_t y;
 
-    State(): angle(0), x(0), y(0) {}
+    State() : angle(0), x(0), y(0) {}
 };
 
 struct Engine {
@@ -21,12 +20,13 @@ struct Engine {
     struct State state;
     vk_helper vk;
 
-    Engine(): app(nullptr), animating(0), state(), vk() {}
+    Engine() : app(nullptr), animating(0), state(), vk() {}
 };
 
 static void engine_init_display(struct Engine* engine) {
     ALOGD("engine_init_display");
-    engine->vk.initialize(engine->app->window, engine->app->activity->assetManager);}
+    engine->vk.initialize(engine->app->window, engine->app->activity->assetManager);
+}
 
 static void engine_draw_frame(struct Engine* engine) {
     engine->vk.drawFrame();
@@ -95,7 +95,7 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
     }
 }
 
-static void on_window_resized(ANativeActivity *activity, ANativeWindow *window) {
+static void on_window_resized(ANativeActivity* activity, ANativeWindow* window) {
     ALOGD("HAHA: onNativeWindowResized");
     (void)activity;
     (void)window;
@@ -130,7 +130,6 @@ void android_main(struct android_app* app) {
         // If animating, we loop until all events are read, then continue
         // to draw the next frame of animation.
         while (ALooper_pollAll(engine.animating ? 0 : -1, nullptr, &events, (void**)&source) >= 0) {
-
             // Process this event.
             if (source != nullptr) {
                 source->process(app, source);

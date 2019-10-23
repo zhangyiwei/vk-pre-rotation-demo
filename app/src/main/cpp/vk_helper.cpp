@@ -1,16 +1,21 @@
 #include "vk_helper.h"
 
+#include <android/log.h>
 #include <unistd.h>
 
-#include <android/log.h>
 #include <glm/glm.hpp>
 
 #define LOG_TAG "VKDEMO"
 #define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define ASSERT(cond) if (!(cond)) { __android_log_assert(#cond, LOG_TAG, "Error: " #cond " at " __FILE__ ":%d", __LINE__); }
+#define ASSERT(cond)                                                                           \
+    if (!(cond)) {                                                                             \
+        __android_log_assert(#cond, LOG_TAG, "Error: " #cond " at " __FILE__ ":%d", __LINE__); \
+    }
 
-#define GET_PROC(F) m##F = reinterpret_cast<PFN_vk##F>(vkGetInstanceProcAddr(VK_NULL_HANDLE, "vk" #F))
-#define GET_INST_PROC(F) m##F = reinterpret_cast<PFN_vk##F>(vkGetInstanceProcAddr(mInstance, "vk" #F))
+#define GET_PROC(F) \
+    m##F = reinterpret_cast<PFN_vk##F>(vkGetInstanceProcAddr(VK_NULL_HANDLE, "vk" #F))
+#define GET_INST_PROC(F) \
+    m##F = reinterpret_cast<PFN_vk##F>(vkGetInstanceProcAddr(mInstance, "vk" #F))
 #define GET_DEV_PROC(F) m##F = reinterpret_cast<PFN_vk##F>(mGetDeviceProcAddr(mDevice, "vk" #F))
 
 static const char* kRequiredInstanceExtensions[] = {
@@ -22,19 +27,20 @@ static const char* kRequiredDeviceExtensions[] = {
         "VK_KHR_swapchain",
 };
 
+// clang-format off
 static const float vertexData[] = {
-        -1.0F, -1.0F, 0.0F, // LT
-        -1.0F,  0.0F, 0.0F, // LC
-         0.0F, -1.0F, 0.0F, // CT
-         0.0F,  0.0F, 0.0F, // CC
-         1.0F, -1.0F, 0.0F, // RT
-         1.0F,  0.0F, 0.0F, // RC
-        -1.0F,  0.0F, 0.0F, // LC
-        -1.0F,  1.0F, 0.0F, // LB
-         0.0F,  0.0F, 0.0F, // CC
-         0.0F,  1.0F, 0.0F, // CB
-         1.0F,  0.0F, 0.0F, // RC
-         1.0F,  1.0F, 0.0F, // RB
+        -1.0F, -1.0F,  0.0F, // LT
+        -1.0F,  0.0F,  0.0F, // LC
+         0.0F, -1.0F,  0.0F, // CT
+         0.0F,  0.0F,  0.0F, // CC
+         1.0F, -1.0F,  0.0F, // RT
+         1.0F,  0.0F,  0.0F, // RC
+        -1.0F,  0.0F,  0.0F, // LC
+        -1.0F,  1.0F,  0.0F, // LB
+         0.0F,  0.0F,  0.0F, // CC
+         0.0F,  1.0F,  0.0F, // CB
+         1.0F,  0.0F,  0.0F, // RC
+         1.0F,  1.0F,  0.0F, // RB
 };
 
 static const float fragData[] = {
@@ -43,6 +49,7 @@ static const float fragData[] = {
         0.0F, 0.0F, 1.0F, // Blue
         1.0F, 1.0F, 0.0F, // Yellow
 };
+// clang-format on
 
 static const uint32_t kReqImageCount = 3;
 
@@ -66,7 +73,8 @@ void vk_helper::createInstance() {
     uint32_t extensionCount = 0;
     ASSERT(mEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr) == VK_SUCCESS);
     std::vector<VkExtensionProperties> supportedInstanceExtensions(extensionCount);
-    ASSERT(mEnumerateInstanceExtensionProperties(nullptr, &extensionCount, supportedInstanceExtensions.data()) == VK_SUCCESS);
+    ASSERT(mEnumerateInstanceExtensionProperties(nullptr, &extensionCount,
+                                                 supportedInstanceExtensions.data()) == VK_SUCCESS);
 
     std::vector<const char*> enabledInstanceExtensions;
     for (const auto extension : kRequiredInstanceExtensions) {
@@ -122,9 +130,11 @@ void vk_helper::createDevice() {
     mGpu = gpus[0];
 
     uint32_t extensionCount = 0;
-    ASSERT(mEnumerateDeviceExtensionProperties(mGpu, nullptr, &extensionCount, nullptr) == VK_SUCCESS);
+    ASSERT(mEnumerateDeviceExtensionProperties(mGpu, nullptr, &extensionCount, nullptr) ==
+           VK_SUCCESS);
     std::vector<VkExtensionProperties> supportedDeviceExtensions(extensionCount);
-    ASSERT(mEnumerateDeviceExtensionProperties(mGpu, nullptr, &extensionCount, supportedDeviceExtensions.data()) == VK_SUCCESS);
+    ASSERT(mEnumerateDeviceExtensionProperties(mGpu, nullptr, &extensionCount,
+                                               supportedDeviceExtensions.data()) == VK_SUCCESS);
 
     std::vector<const char*> enabledDeviceExtensions;
     for (const auto extension : kRequiredDeviceExtensions) {
@@ -229,13 +239,16 @@ void vk_helper::createSwapchain(ANativeWindow* window) {
     ASSERT(mCreateAndroidSurfaceKHR(mInstance, &surfaceInfo, nullptr, &mSurface) == VK_SUCCESS);
 
     VkBool32 surfaceSupported = VK_FALSE;
-    ASSERT(mGetPhysicalDeviceSurfaceSupportKHR(mGpu, mQueueFamilyIndex, mSurface, &surfaceSupported) == VK_SUCCESS);
+    ASSERT(mGetPhysicalDeviceSurfaceSupportKHR(mGpu, mQueueFamilyIndex, mSurface,
+                                               &surfaceSupported) == VK_SUCCESS);
     ASSERT(surfaceSupported == VK_TRUE);
 
     uint32_t formatCount = 0;
-    ASSERT(mGetPhysicalDeviceSurfaceFormatsKHR(mGpu, mSurface, &formatCount, nullptr) == VK_SUCCESS);
+    ASSERT(mGetPhysicalDeviceSurfaceFormatsKHR(mGpu, mSurface, &formatCount, nullptr) ==
+           VK_SUCCESS);
     std::vector<VkSurfaceFormatKHR> formats(formatCount);
-    ASSERT(mGetPhysicalDeviceSurfaceFormatsKHR(mGpu, mSurface, &formatCount, formats.data()) == VK_SUCCESS);
+    ASSERT(mGetPhysicalDeviceSurfaceFormatsKHR(mGpu, mSurface, &formatCount, formats.data()) ==
+           VK_SUCCESS);
 
     uint32_t formatIndex;
     for (formatIndex = 0; formatIndex < formatCount; ++formatIndex) {
@@ -247,18 +260,18 @@ void vk_helper::createSwapchain(ANativeWindow* window) {
     mFormat = formats[formatIndex].format;
 
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    ASSERT(mGetPhysicalDeviceSurfaceCapabilitiesKHR(mGpu, mSurface, &surfaceCapabilities) == VK_SUCCESS);
+    ASSERT(mGetPhysicalDeviceSurfaceCapabilitiesKHR(mGpu, mSurface, &surfaceCapabilities) ==
+           VK_SUCCESS);
 
     ALOGD("Vulkan Surface Capabilities:\n");
-    ALOGD("\timage count: %u - %u\n",
-            surfaceCapabilities.minImageCount, surfaceCapabilities.maxImageCount);
+    ALOGD("\timage count: %u - %u\n", surfaceCapabilities.minImageCount,
+          surfaceCapabilities.maxImageCount);
     ALOGD("\tarray layers: %u\n", surfaceCapabilities.maxImageArrayLayers);
-    ALOGD("\timage size (now): %dx%d\n",
-            surfaceCapabilities.currentExtent.width,
-            surfaceCapabilities.currentExtent.height);
-    ALOGD("\timage size (extent): %dx%d - %dx%d\n",
-            surfaceCapabilities.minImageExtent.width, surfaceCapabilities.minImageExtent.height,
-            surfaceCapabilities.maxImageExtent.width, surfaceCapabilities.maxImageExtent.height);
+    ALOGD("\timage size (now): %dx%d\n", surfaceCapabilities.currentExtent.width,
+          surfaceCapabilities.currentExtent.height);
+    ALOGD("\timage size (extent): %dx%d - %dx%d\n", surfaceCapabilities.minImageExtent.width,
+          surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.width,
+          surfaceCapabilities.maxImageExtent.height);
     ALOGD("\tusage: %x\n", surfaceCapabilities.supportedUsageFlags);
     ALOGD("\tcurrent transform: %u\n", surfaceCapabilities.currentTransform);
     ALOGD("\tallowed transforms: %x\n", surfaceCapabilities.supportedTransforms);
@@ -269,8 +282,7 @@ void vk_helper::createSwapchain(ANativeWindow* window) {
     mPreTransform = surfaceCapabilities.currentTransform;
 
     if ((mPreTransform &
-         (VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR |
-          VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR |
+         (VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR |
           VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR |
           VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR)) != 0) {
         mWidth = mWidth ^ mHeight;
@@ -360,7 +372,8 @@ void vk_helper::createRenderPass() {
     ALOGD("Successfully created render pass");
 }
 
-void vk_helper::loadShaderFromFile(AAssetManager* assetManager, const char* filePath, VkShaderModule* outShader) {
+void vk_helper::loadShaderFromFile(AAssetManager* assetManager, const char* filePath,
+                                   VkShaderModule* outShader) {
     ASSERT(filePath);
 
     AAsset* file = AAssetManager_open(assetManager, filePath, AASSET_MODE_BUFFER);
@@ -398,7 +411,8 @@ void vk_helper::createGraphicsPipeline(AAssetManager* assetManager) {
             .pushConstantRangeCount = 1,
             .pPushConstantRanges = &pushConstantRange,
     };
-    ASSERT(mCreatePipelineLayout(mDevice, &pipelineLayoutCreateInfo, nullptr, &mPipelineLayout) == VK_SUCCESS);
+    ASSERT(mCreatePipelineLayout(mDevice, &pipelineLayoutCreateInfo, nullptr, &mPipelineLayout) ==
+           VK_SUCCESS);
 
     VkShaderModule vertexShader = VK_NULL_HANDLE;
     VkShaderModule fragmentShader = VK_NULL_HANDLE;
@@ -474,7 +488,7 @@ void vk_helper::createGraphicsPipeline(AAssetManager* assetManager) {
             .dstAlphaBlendFactor = (VkBlendFactor)0,
             .alphaBlendOp = (VkBlendOp)0,
             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+                    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
     };
     const VkPipelineColorBlendStateCreateInfo colorBlendInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
@@ -549,7 +563,8 @@ void vk_helper::createGraphicsPipeline(AAssetManager* assetManager) {
             .basePipelineHandle = VK_NULL_HANDLE,
             .basePipelineIndex = 0,
     };
-    ASSERT(mCreateGraphicsPipelines(mDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &mPipeline) == VK_SUCCESS);
+    ASSERT(mCreateGraphicsPipelines(mDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr,
+                                    &mPipeline) == VK_SUCCESS);
 
     mDestroyShaderModule(mDevice, vertexShader, nullptr);
     mDestroyShaderModule(mDevice, fragmentShader, nullptr);
@@ -616,7 +631,8 @@ void vk_helper::createCommandBuffers() {
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
             .queueFamilyIndex = mQueueFamilyIndex,
     };
-    ASSERT(mCreateCommandPool(mDevice, &commandPoolCreateInfo, nullptr, &mCommandPool) == VK_SUCCESS);
+    ASSERT(mCreateCommandPool(mDevice, &commandPoolCreateInfo, nullptr, &mCommandPool) ==
+           VK_SUCCESS);
 
     mCommandBuffers.resize(mImageCount, VK_NULL_HANDLE);
     const VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
@@ -626,7 +642,8 @@ void vk_helper::createCommandBuffers() {
             .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
             .commandBufferCount = mImageCount,
     };
-    ASSERT(mAllocateCommandBuffers(mDevice, &commandBufferAllocateInfo, mCommandBuffers.data()) == VK_SUCCESS);
+    ASSERT(mAllocateCommandBuffers(mDevice, &commandBufferAllocateInfo, mCommandBuffers.data()) ==
+           VK_SUCCESS);
 
     ALOGD("Successfully created command buffers");
 }
@@ -654,7 +671,7 @@ void vk_helper::createSemaphores() {
     ALOGD("Successfully created semaphores");
 }
 
-void vk_helper::initialize(ANativeWindow *window, AAssetManager *assetManager){
+void vk_helper::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     createInstance();
     createDevice();
     createSwapchain(window);
@@ -690,7 +707,8 @@ void vk_helper::createImageView(uint32_t index) {
                             .layerCount = 1,
                     },
     };
-    ASSERT(mCreateImageView(mDevice, &imageViewCreateInfo, nullptr, &mImageViews[index]) == VK_SUCCESS);
+    ASSERT(mCreateImageView(mDevice, &imageViewCreateInfo, nullptr, &mImageViews[index]) ==
+           VK_SUCCESS);
 
     ALOGD("Successfully created imageView[%u]", index);
 }
@@ -711,7 +729,8 @@ void vk_helper::createFramebuffer(uint32_t index) {
             .height = mHeight,
             .layers = 1,
     };
-    ASSERT(mCreateFramebuffer(mDevice, &framebufferCreateInfo, nullptr, &mFramebuffers[index]) == VK_SUCCESS);
+    ASSERT(mCreateFramebuffer(mDevice, &framebufferCreateInfo, nullptr, &mFramebuffers[index]) ==
+           VK_SUCCESS);
 
     ALOGD("Successfully created framebuffer[%u]", index);
 }
@@ -759,16 +778,20 @@ void vk_helper::recordCommandBuffer(uint32_t index) {
     VkDeviceSize offset = 0;
     mCmdBindVertexBuffers(mCommandBuffers[index], 0, 1, &mVertexBuffer, &offset);
 
-    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 3 * sizeof(float), &fragData[0]);
+    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                      3 * sizeof(float), &fragData[0]);
     mCmdDraw(mCommandBuffers[index], 4, 1, 0, 0);
 
-    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 3 * sizeof(float), &fragData[3]);
+    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                      3 * sizeof(float), &fragData[3]);
     mCmdDraw(mCommandBuffers[index], 4, 1, 2, 0);
 
-    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 3 * sizeof(float), &fragData[6]);
+    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                      3 * sizeof(float), &fragData[6]);
     mCmdDraw(mCommandBuffers[index], 4, 1, 6, 0);
 
-    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 3 * sizeof(float), &fragData[9]);
+    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                      3 * sizeof(float), &fragData[9]);
     mCmdDraw(mCommandBuffers[index], 4, 1, 8, 0);
 
     mCmdEndRenderPass(mCommandBuffers[index]);
@@ -786,7 +809,8 @@ void vk_helper::drawFrame() {
     VkSemaphore currentRenderSemaphore = mFreeRenderSemaphore;
 
     uint32_t index;
-    ASSERT(mAcquireNextImageKHR(mDevice, mSwapchain, UINT64_MAX, currentAcquireSemaphore, VK_NULL_HANDLE, &index) == VK_SUCCESS);
+    ASSERT(mAcquireNextImageKHR(mDevice, mSwapchain, UINT64_MAX, currentAcquireSemaphore,
+                                VK_NULL_HANDLE, &index) == VK_SUCCESS);
 
     if (mFramebuffers[index] == VK_NULL_HANDLE) {
         createFramebuffer(index);
@@ -827,7 +851,7 @@ void vk_helper::drawFrame() {
     mFreeRenderSemaphore = mRenderSemaphores[index];
     mRenderSemaphores[index] = currentRenderSemaphore;
 
-    //ALOGD("Successfully draw a frame[SUBOPTIMAL(%u)]", ret == VK_SUBOPTIMAL_KHR);
+    // ALOGD("Successfully draw a frame[SUBOPTIMAL(%u)]", ret == VK_SUBOPTIMAL_KHR);
 }
 
 void vk_helper::destroy() {
@@ -857,7 +881,8 @@ void vk_helper::destroy() {
         }
 
         if (!mCommandBuffers.empty()) {
-            mFreeCommandBuffers(mDevice, mCommandPool, mCommandBuffers.size(), mCommandBuffers.data());
+            mFreeCommandBuffers(mDevice, mCommandPool, mCommandBuffers.size(),
+                                mCommandBuffers.data());
         }
         mCommandBuffers.clear();
         mDestroyCommandPool(mDevice, mCommandPool, nullptr);

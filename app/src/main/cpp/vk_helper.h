@@ -18,7 +18,8 @@ private:
     void createDevice();
     void createSwapchain(ANativeWindow* window);
     void createRenderPass();
-    void loadShaderFromFile(AAssetManager* assetManager, const char* filePath, VkShaderModule* outShader);
+    void loadShaderFromFile(AAssetManager* assetManager, const char* filePath,
+                            VkShaderModule* outShader);
     void createGraphicsPipeline(AAssetManager* assetManager);
     void createVertexBuffer();
     void createCommandBuffers();
@@ -44,7 +45,8 @@ private:
     PFN_vkEnumeratePhysicalDevices mEnumeratePhysicalDevices = nullptr;
     PFN_vkGetDeviceProcAddr mGetDeviceProcAddr = nullptr;
     PFN_vkGetPhysicalDeviceMemoryProperties mGetPhysicalDeviceMemoryProperties = nullptr;
-    PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR mGetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
+    PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR mGetPhysicalDeviceSurfaceCapabilitiesKHR =
+            nullptr;
     PFN_vkGetPhysicalDeviceSurfaceFormatsKHR mGetPhysicalDeviceSurfaceFormatsKHR = nullptr;
     PFN_vkGetPhysicalDeviceSurfaceSupportKHR mGetPhysicalDeviceSurfaceSupportKHR = nullptr;
     PFN_vkGetPhysicalDeviceQueueFamilyProperties mGetPhysicalDeviceQueueFamilyProperties = nullptr;
