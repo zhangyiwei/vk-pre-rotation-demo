@@ -29,7 +29,11 @@ static void engine_init_display(struct Engine* engine) {
 }
 
 static void engine_draw_frame(struct Engine* engine) {
+    static uint64_t draw_count = 0;
     engine->vk.drawFrame();
+    if (++draw_count % 100 == 0) {
+        ALOGD("engine_draw_frame[%" PRIu64 "]", draw_count);
+    }
 }
 
 static void engine_term_display(struct Engine* engine) {
