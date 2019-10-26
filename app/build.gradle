@@ -6,8 +6,6 @@ android {
         applicationId "com.google.vkdemo"
         minSdkVersion 29
         targetSdkVersion 29
-        versionCode 1
-        versionName "1.0"
         externalNativeBuild {
             cmake {
                 arguments '-DANDROID_STL=c++_static'

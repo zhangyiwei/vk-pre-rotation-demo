@@ -38,6 +38,7 @@ static void engine_draw_frame(struct Engine* engine) {
 
 static void engine_term_display(struct Engine* engine) {
     ALOGD("engine_term_display");
+    engine->animating = 0;
     engine->vk.destroy();
 }
 
@@ -57,50 +58,52 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
     auto engine = static_cast<Engine*>(app->userData);
     switch (cmd) {
         case APP_CMD_SAVE_STATE:
-            ALOGD("HAHA: SAVE_STATE");
+            ALOGD("SAVE_STATE");
             // The system has asked us to save our current state.  Do so.
             engine->app->savedState = malloc(sizeof(struct State));
             *((struct State*)engine->app->savedState) = engine->state;
             engine->app->savedStateSize = sizeof(struct State);
             break;
         case APP_CMD_INIT_WINDOW:
-            engine_init_display(engine);
+            if (engine->app->window != nullptr) {
+                engine_init_display(engine);
+            }
             break;
         case APP_CMD_TERM_WINDOW:
             // The window is being hidden or closed, clean it up.
             engine_term_display(engine);
             break;
         case APP_CMD_CONTENT_RECT_CHANGED:
-            ALOGD("HAHA: RECT_CHANGED");
+            ALOGD("RECT_CHANGED");
             break;
         case APP_CMD_CONFIG_CHANGED:
-            ALOGD("HAHA: CONFIG_CHANGED");
+            ALOGD("CONFIG_CHANGED");
             break;
         case APP_CMD_WINDOW_RESIZED:
-            ALOGD("HAHA: WINDOW_RESIZED");
+            ALOGD("WINDOW_RESIZED");
             break;
         case APP_CMD_INPUT_CHANGED:
-            ALOGD("HAHA: INPUT_CHANGED");
+            ALOGD("INPUT_CHANGED");
             break;
         case APP_CMD_WINDOW_REDRAW_NEEDED:
-            ALOGD("HAHA: WINDOW_REDRAW_NEEDED");
+            ALOGD("WINDOW_REDRAW_NEEDED");
             break;
         case APP_CMD_GAINED_FOCUS:
-            ALOGD("HAHA: GAINED_FOCUS");
+            ALOGD("GAINED_FOCUS");
             break;
         case APP_CMD_LOST_FOCUS:
-            ALOGD("HAHA: LOST_FOCUS");
+            ALOGD("LOST_FOCUS");
             // Stop animating.
             engine->animating = 0;
             break;
         default:
-            ALOGD("HAHA: UNKNOWN CMD[%d]", cmd);
+            ALOGD("UNKNOWN CMD[%d]", cmd);
             break;
     }
 }
 
 static void on_window_resized(ANativeActivity* activity, ANativeWindow* window) {
-    ALOGD("HAHA: onNativeWindowResized");
+    ALOGD("onNativeWindowResized");
     (void)activity;
     (void)window;
 }
