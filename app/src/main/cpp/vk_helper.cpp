@@ -185,6 +185,7 @@ void vk_helper::createDevice() {
     GET_DEV_PROC(AllocateCommandBuffers);
     GET_DEV_PROC(AllocateMemory);
     GET_DEV_PROC(BeginCommandBuffer);
+    GET_DEV_PROC(BindBufferMemory);
     GET_DEV_PROC(CmdBeginRenderPass);
     GET_DEV_PROC(CmdBindPipeline);
     GET_DEV_PROC(CmdBindVertexBuffers);
@@ -219,8 +220,10 @@ void vk_helper::createDevice() {
     GET_DEV_PROC(GetBufferMemoryRequirements);
     GET_DEV_PROC(GetDeviceQueue);
     GET_DEV_PROC(GetSwapchainImagesKHR);
+    GET_DEV_PROC(MapMemory);
     GET_DEV_PROC(QueuePresentKHR);
     GET_DEV_PROC(QueueSubmit);
+    GET_DEV_PROC(UnmapMemory);
 
     mGetDeviceQueue(mDevice, mQueueFamilyIndex, 0, &mQueue);
 
@@ -614,12 +617,12 @@ void vk_helper::createVertexBuffer() {
     ASSERT(mAllocateMemory(mDevice, &memoryAllocateInfo, nullptr, &mDeviceMemory) == VK_SUCCESS);
 
     void* data;
-    ASSERT(vkMapMemory(mDevice, mDeviceMemory, 0, sizeof(vertexData), 0, &data) == VK_SUCCESS);
+    ASSERT(mMapMemory(mDevice, mDeviceMemory, 0, sizeof(vertexData), 0, &data) == VK_SUCCESS);
 
     memcpy(data, vertexData, sizeof(vertexData));
-    vkUnmapMemory(mDevice, mDeviceMemory);
+    mUnmapMemory(mDevice, mDeviceMemory);
 
-    ASSERT(vkBindBufferMemory(mDevice, mVertexBuffer, mDeviceMemory, 0) == VK_SUCCESS);
+    ASSERT(mBindBufferMemory(mDevice, mVertexBuffer, mDeviceMemory, 0) == VK_SUCCESS);
 
     ALOGD("Successfully created vertex buffer");
 }

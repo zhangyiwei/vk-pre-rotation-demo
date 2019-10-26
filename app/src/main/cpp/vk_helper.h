@@ -56,6 +56,7 @@ private:
     PFN_vkAllocateCommandBuffers mAllocateCommandBuffers = nullptr;
     PFN_vkAllocateMemory mAllocateMemory = nullptr;
     PFN_vkBeginCommandBuffer mBeginCommandBuffer = nullptr;
+    PFN_vkBindBufferMemory mBindBufferMemory = nullptr;
     PFN_vkCmdBeginRenderPass mCmdBeginRenderPass = nullptr;
     PFN_vkCmdBindVertexBuffers mCmdBindVertexBuffers = nullptr;
     PFN_vkCmdEndRenderPass mCmdEndRenderPass = nullptr;
@@ -83,15 +84,17 @@ private:
     PFN_vkDestroySemaphore mDestroySemaphore = nullptr;
     PFN_vkDestroyShaderModule mDestroyShaderModule = nullptr;
     PFN_vkDestroySwapchainKHR mDestroySwapchainKHR = nullptr;
+    PFN_vkDeviceWaitIdle mDeviceWaitIdle = nullptr;
     PFN_vkEndCommandBuffer mEndCommandBuffer = nullptr;
     PFN_vkFreeCommandBuffers mFreeCommandBuffers = nullptr;
     PFN_vkFreeMemory mFreeMemory = nullptr;
     PFN_vkGetBufferMemoryRequirements mGetBufferMemoryRequirements = nullptr;
     PFN_vkGetDeviceQueue mGetDeviceQueue = nullptr;
     PFN_vkGetSwapchainImagesKHR mGetSwapchainImagesKHR = nullptr;
+    PFN_vkMapMemory mMapMemory = nullptr;
     PFN_vkQueuePresentKHR mQueuePresentKHR = nullptr;
     PFN_vkQueueSubmit mQueueSubmit = nullptr;
-    PFN_vkDeviceWaitIdle mDeviceWaitIdle = nullptr;
+    PFN_vkUnmapMemory mUnmapMemory = nullptr;
 
     // Members need to be tracked
     VkInstance mInstance = VK_NULL_HANDLE;
