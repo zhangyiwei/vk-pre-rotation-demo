@@ -3,7 +3,8 @@
 #include <android/log.h>
 #include <unistd.h>
 
-#include <glm/glm.hpp>
+#include "glm/glm.hpp"
+#include "stb/stb_image.h"
 
 #define LOG_TAG "VKDEMO"
 #define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
