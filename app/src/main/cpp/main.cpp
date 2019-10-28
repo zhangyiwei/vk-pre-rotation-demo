@@ -2,7 +2,7 @@
 #include <android_native_app_glue.h>
 #include <jni.h>
 
-#include "vk_helper.h"
+#include "VkHelper.h"
 
 #define ALOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, "VKDEMO", __VA_ARGS__))
 
@@ -18,32 +18,32 @@ struct Engine {
     struct android_app* app;
     int animating;
     struct State state;
-    vk_helper vk;
+    VkHelper vk;
 
     Engine() : app(nullptr), animating(0), state(), vk() {}
 };
 
-static void engine_init_display(struct Engine* engine) {
-    ALOGD("engine_init_display");
+static void engineInitDisplay(struct Engine* engine) {
+    ALOGD("%s", __FUNCTION__);
     engine->vk.initialize(engine->app->window, engine->app->activity->assetManager);
 }
 
-static void engine_draw_frame(struct Engine* engine) {
-    static uint64_t draw_count = 0;
+static void engineDrawFrame(struct Engine* engine) {
+    static uint64_t count = 0;
     engine->vk.drawFrame();
-    if (++draw_count % 100 == 0) {
-        ALOGD("engine_draw_frame[%" PRIu64 "]", draw_count);
+    if (++count % 100 == 0) {
+        ALOGD("%s[%" PRIu64 "]", __FUNCTION__, count);
     }
 }
 
-static void engine_term_display(struct Engine* engine) {
-    ALOGD("engine_term_display");
+static void engineTermDisplay(struct Engine* engine) {
+    ALOGD("%s", __FUNCTION__);
     engine->animating = 0;
     engine->vk.destroy();
 }
 
-static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) {
-    ALOGD("engine_handle_input");
+static int32_t engineHandleInput(struct android_app* app, AInputEvent* event) {
+    ALOGD("%s", __FUNCTION__);
     auto engine = static_cast<Engine*>(app->userData);
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
         engine->animating = 1;
@@ -54,7 +54,8 @@ static int32_t engine_handle_input(struct android_app* app, AInputEvent* event) 
     return 0;
 }
 
-static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
+static void engineHandleCmd(struct android_app* app, int32_t cmd) {
+    ALOGD("%s", __FUNCTION__);
     auto engine = static_cast<Engine*>(app->userData);
     switch (cmd) {
         case APP_CMD_SAVE_STATE:
@@ -66,13 +67,13 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
             break;
         case APP_CMD_INIT_WINDOW:
             if (engine->app->window != nullptr) {
-                engine_init_display(engine);
-                engine_draw_frame(engine);
+                engineInitDisplay(engine);
+                engineDrawFrame(engine);
             }
             break;
         case APP_CMD_TERM_WINDOW:
             // The window is being hidden or closed, clean it up.
-            engine_term_display(engine);
+            engineTermDisplay(engine);
             break;
         case APP_CMD_CONTENT_RECT_CHANGED:
             ALOGD("RECT_CHANGED");
@@ -103,8 +104,8 @@ static void engine_handle_cmd(struct android_app* app, int32_t cmd) {
     }
 }
 
-static void on_window_resized(ANativeActivity* activity, ANativeWindow* window) {
-    ALOGD("onNativeWindowResized");
+static void onWindowResized(ANativeActivity* activity, ANativeWindow* window) {
+    ALOGD("%s", __FUNCTION__);
     (void)activity;
     (void)window;
 }
@@ -118,9 +119,9 @@ void android_main(struct android_app* app) {
     struct Engine engine;
 
     app->userData = &engine;
-    app->onAppCmd = engine_handle_cmd;
-    app->onInputEvent = engine_handle_input;
-    app->activity->callbacks->onNativeWindowResized = on_window_resized;
+    app->onAppCmd = engineHandleCmd;
+    app->onInputEvent = engineHandleInput;
+    app->activity->callbacks->onNativeWindowResized = onWindowResized;
 
     engine.app = app;
 
@@ -145,7 +146,7 @@ void android_main(struct android_app* app) {
 
             // Check if we are exiting.
             if (app->destroyRequested != 0) {
-                engine_term_display(&engine);
+                engineTermDisplay(&engine);
                 return;
             }
         }
@@ -153,7 +154,7 @@ void android_main(struct android_app* app) {
         if (engine.animating) {
             // Drawing is throttled to the screen update rate, so there
             // is no need to do timing here.
-            engine_draw_frame(&engine);
+            engineDrawFrame(&engine);
         }
     }
 }

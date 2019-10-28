@@ -6,9 +6,9 @@
 
 #include <vector>
 
-class vk_helper {
+class VkHelper {
 public:
-    explicit vk_helper() { mIsReady.store(false); }
+    explicit VkHelper() { mIsReady.store(false); }
     void initialize(ANativeWindow* window, AAssetManager* assetManager);
     void drawFrame();
     void destroy();

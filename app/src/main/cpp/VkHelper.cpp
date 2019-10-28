@@ -1,4 +1,4 @@
-#include "vk_helper.h"
+#include "VkHelper.h"
 
 #include <android/log.h>
 #include <unistd.h>
@@ -61,7 +61,7 @@ static bool hasExtension(const char* extension_name,
                         }) != extensions.cend();
 }
 
-void vk_helper::createInstance() {
+void VkHelper::createInstance() {
     GET_PROC(CreateInstance);
     GET_PROC(EnumerateInstanceExtensionProperties);
     GET_PROC(EnumerateInstanceVersion);
@@ -120,7 +120,7 @@ void vk_helper::createInstance() {
     ALOGD("Successfully created instance");
 }
 
-void vk_helper::createDevice() {
+void VkHelper::createDevice() {
     uint32_t gpuCount = 0;
     ASSERT(mEnumeratePhysicalDevices(mInstance, &gpuCount, nullptr) == VK_SUCCESS);
     ASSERT(gpuCount);
@@ -230,7 +230,7 @@ void vk_helper::createDevice() {
     ALOGD("Successfully created device");
 }
 
-void vk_helper::createSwapchain(ANativeWindow* window) {
+void VkHelper::createSwapchain(ANativeWindow* window) {
     ASSERT(window);
 
     const VkAndroidSurfaceCreateInfoKHR surfaceInfo = {
@@ -331,7 +331,7 @@ void vk_helper::createSwapchain(ANativeWindow* window) {
     ALOGD("Successfully created swapchain");
 }
 
-void vk_helper::createRenderPass() {
+void VkHelper::createRenderPass() {
     const VkAttachmentDescription attachmentDescription = {
             .flags = 0,
             .format = mFormat,
@@ -375,8 +375,8 @@ void vk_helper::createRenderPass() {
     ALOGD("Successfully created render pass");
 }
 
-void vk_helper::loadShaderFromFile(AAssetManager* assetManager, const char* filePath,
-                                   VkShaderModule* outShader) {
+void VkHelper::loadShaderFromFile(AAssetManager* assetManager, const char* filePath,
+                                  VkShaderModule* outShader) {
     ASSERT(filePath);
 
     AAsset* file = AAssetManager_open(assetManager, filePath, AASSET_MODE_BUFFER);
@@ -399,7 +399,7 @@ void vk_helper::loadShaderFromFile(AAssetManager* assetManager, const char* file
     ALOGD("Successfully created shader module from %s", filePath);
 }
 
-void vk_helper::createGraphicsPipeline(AAssetManager* assetManager) {
+void VkHelper::createGraphicsPipeline(AAssetManager* assetManager) {
     const VkPushConstantRange pushConstantRange = {
             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
             .offset = 0,
@@ -575,7 +575,7 @@ void vk_helper::createGraphicsPipeline(AAssetManager* assetManager) {
     ALOGD("Successfully created graphics pipeline");
 }
 
-void vk_helper::createVertexBuffer() {
+void VkHelper::createVertexBuffer() {
     const uint32_t queueFamilyIndex = mQueueFamilyIndex;
     const VkBufferCreateInfo bufferCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -627,7 +627,7 @@ void vk_helper::createVertexBuffer() {
     ALOGD("Successfully created vertex buffer");
 }
 
-void vk_helper::createCommandBuffers() {
+void VkHelper::createCommandBuffers() {
     const VkCommandPoolCreateInfo commandPoolCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .pNext = nullptr,
@@ -651,7 +651,7 @@ void vk_helper::createCommandBuffers() {
     ALOGD("Successfully created command buffers");
 }
 
-void vk_helper::createSemaphore(VkSemaphore* semaphore) {
+void VkHelper::createSemaphore(VkSemaphore* semaphore) {
     const VkSemaphoreCreateInfo semaphoreCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
             .pNext = nullptr,
@@ -660,7 +660,7 @@ void vk_helper::createSemaphore(VkSemaphore* semaphore) {
     ASSERT(mCreateSemaphore(mDevice, &semaphoreCreateInfo, nullptr, semaphore) == VK_SUCCESS);
 }
 
-void vk_helper::createSemaphores() {
+void VkHelper::createSemaphores() {
     mAcquireSemaphores.resize(mImageCount, VK_NULL_HANDLE);
     mRenderSemaphores.resize(mImageCount, VK_NULL_HANDLE);
     for (int i = 0; i < mImageCount; ++i) {
@@ -674,7 +674,7 @@ void vk_helper::createSemaphores() {
     ALOGD("Successfully created semaphores");
 }
 
-void vk_helper::initialize(ANativeWindow* window, AAssetManager* assetManager) {
+void VkHelper::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     createInstance();
     createDevice();
     createSwapchain(window);
@@ -686,7 +686,7 @@ void vk_helper::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     mIsReady.store(true);
 }
 
-void vk_helper::createImageView(uint32_t index) {
+void VkHelper::createImageView(uint32_t index) {
     const VkImageViewCreateInfo imageViewCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .pNext = nullptr,
@@ -716,7 +716,7 @@ void vk_helper::createImageView(uint32_t index) {
     ALOGD("Successfully created imageView[%u]", index);
 }
 
-void vk_helper::createFramebuffer(uint32_t index) {
+void VkHelper::createFramebuffer(uint32_t index) {
     if (mImageViews[index] == VK_NULL_HANDLE) {
         createImageView(index);
     }
@@ -738,7 +738,7 @@ void vk_helper::createFramebuffer(uint32_t index) {
     ALOGD("Successfully created framebuffer[%u]", index);
 }
 
-void vk_helper::recordCommandBuffer(uint32_t index) {
+void VkHelper::recordCommandBuffer(uint32_t index) {
     const VkCommandBufferBeginInfo commandBufferBeginInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             .pNext = nullptr,
@@ -802,7 +802,7 @@ void vk_helper::recordCommandBuffer(uint32_t index) {
     ASSERT(mEndCommandBuffer(mCommandBuffers[index]) == VK_SUCCESS);
 }
 
-void vk_helper::drawFrame() {
+void VkHelper::drawFrame() {
     if (!mIsReady.load()) {
         ALOGD("Vulkan is not ready yet");
         return;
@@ -857,7 +857,7 @@ void vk_helper::drawFrame() {
     // ALOGD("Successfully draw a frame[SUBOPTIMAL(%u)]", ret == VK_SUBOPTIMAL_KHR);
 }
 
-void vk_helper::destroy() {
+void VkHelper::destroy() {
     if (mDevice != VK_NULL_HANDLE) {
         mDeviceWaitIdle(mDevice);
 
