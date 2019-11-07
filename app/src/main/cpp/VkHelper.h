@@ -4,6 +4,7 @@
 #include <android/native_window.h>
 #include <vulkan/vulkan.h>
 
+#include <mutex>
 #include <vector>
 
 class VkHelper {
@@ -142,6 +143,7 @@ private:
 
     // Members need to be tracked
     std::atomic<bool> mIsReady;
+    std::mutex mMutex;
     AAssetManager* mAssetManager = nullptr;
 
     VkInstance mInstance = VK_NULL_HANDLE;

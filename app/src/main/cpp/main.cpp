@@ -16,12 +16,12 @@ struct State {
 
 struct Engine {
     struct android_app* app;
-    int animating;
     struct State state;
     VkHelper vk;
+    bool animating;
     uint64_t count;
 
-    Engine() : app(nullptr), animating(0), state(), vk(), count(0) {}
+    Engine() : app(nullptr), state(), vk(), animating(false), count(0) {}
 };
 
 static void engineInitDisplay(struct Engine* engine) {
@@ -37,9 +37,17 @@ static void engineDrawFrame(struct Engine* engine) {
     }
 }
 
+static void enginePauseDisplay(struct Engine* engine) {
+    engine->animating = false;
+}
+
+static void engineResumeDisplay(struct Engine* engine) {
+    engine->animating = true;
+}
+
 static void engineTermDisplay(struct Engine* engine) {
     ALOGD("%s", __FUNCTION__);
-    engine->animating = 0;
+    engine->animating = false;
     engine->count = 0;
     engine->vk.destroy();
 }
@@ -48,7 +56,6 @@ static int32_t engineHandleInput(struct android_app* app, AInputEvent* event) {
     ALOGD("%s", __FUNCTION__);
     auto engine = static_cast<Engine*>(app->userData);
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
-        engine->animating = 1;
         engine->state.x = static_cast<int32_t>(AMotionEvent_getX(event, 0));
         engine->state.y = static_cast<int32_t>(AMotionEvent_getY(event, 0));
         return 1;
@@ -68,10 +75,7 @@ static void engineHandleCmd(struct android_app* app, int32_t cmd) {
             engine->app->savedStateSize = sizeof(struct State);
             break;
         case APP_CMD_INIT_WINDOW:
-            if (engine->app->window != nullptr) {
-                engineInitDisplay(engine);
-                engineDrawFrame(engine);
-            }
+            engineInitDisplay(engine);
             break;
         case APP_CMD_TERM_WINDOW:
             // The window is being hidden or closed, clean it up.
@@ -94,11 +98,12 @@ static void engineHandleCmd(struct android_app* app, int32_t cmd) {
             break;
         case APP_CMD_GAINED_FOCUS:
             ALOGD("GAINED_FOCUS");
+            engineResumeDisplay(engine);
             break;
         case APP_CMD_LOST_FOCUS:
             ALOGD("LOST_FOCUS");
             // Stop animating.
-            engine->animating = 0;
+            enginePauseDisplay(engine);
             break;
         default:
             ALOGD("UNKNOWN CMD[%d]", cmd);
