@@ -157,6 +157,7 @@ void VkHelper::createDevice() {
     GET_DEV_PROC(BindBufferMemory);
     GET_DEV_PROC(BindImageMemory);
     GET_DEV_PROC(CmdBeginRenderPass);
+    GET_DEV_PROC(CmdBindDescriptorSets);
     GET_DEV_PROC(CmdBindPipeline);
     GET_DEV_PROC(CmdBindVertexBuffers);
     GET_DEV_PROC(CmdCopyImage);
@@ -430,10 +431,11 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
     }
 
     uint32_t channel = 0;
-    unsigned char* imageData = stbi_load_from_memory((const stbi_uc*)file.data(), file.size(),
-                                                     reinterpret_cast<int*>(&outTexture->width),
-                                                     reinterpret_cast<int*>(&outTexture->height),
-                                                     reinterpret_cast<int*>(&channel), 4);
+    unsigned char* imageData =
+            stbi_load_from_memory((const stbi_uc*)file.data(), file.size(),
+                                  reinterpret_cast<int*>(&outTexture->width),
+                                  reinterpret_cast<int*>(&outTexture->height),
+                                  reinterpret_cast<int*>(&channel), 4 /*desired_channels*/);
     ASSERT(channel == 4);
 
     VkImageCreateInfo imageCreateInfo = {
@@ -825,8 +827,8 @@ void VkHelper::createGraphicsPipeline() {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .pNext = nullptr,
             .flags = 0,
-            .setLayoutCount = 0,
-            .pSetLayouts = nullptr,
+            .setLayoutCount = 1,
+            .pSetLayouts = &mDescriptorSetLayout,
             .pushConstantRangeCount = 1,
             .pPushConstantRanges = &pushConstantRange,
     };
@@ -835,28 +837,29 @@ void VkHelper::createGraphicsPipeline() {
 
     VkShaderModule vertexShader = VK_NULL_HANDLE;
     VkShaderModule fragmentShader = VK_NULL_HANDLE;
-    loadShaderFromFile("vert.glsl.spv", &vertexShader);
-    loadShaderFromFile("frag.glsl.spv", &fragmentShader);
+    loadShaderFromFile(kVertexShaderFile, &vertexShader);
+    loadShaderFromFile(kFragmentShaderFile, &fragmentShader);
 
-    const VkPipelineShaderStageCreateInfo shaderStages[2] =
-            {{
-                     .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                     .pNext = nullptr,
-                     .flags = 0,
-                     .stage = VK_SHADER_STAGE_VERTEX_BIT,
-                     .module = vertexShader,
-                     .pName = "main",
-                     .pSpecializationInfo = nullptr,
-             },
-             {
-                     .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                     .pNext = nullptr,
-                     .flags = 0,
-                     .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-                     .module = fragmentShader,
-                     .pName = "main",
-                     .pSpecializationInfo = nullptr,
-             }};
+    const VkPipelineShaderStageCreateInfo shaderStages[2] = {
+            {
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                    .pNext = nullptr,
+                    .flags = 0,
+                    .stage = VK_SHADER_STAGE_VERTEX_BIT,
+                    .module = vertexShader,
+                    .pName = "main",
+                    .pSpecializationInfo = nullptr,
+            },
+            {
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                    .pNext = nullptr,
+                    .flags = 0,
+                    .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .module = fragmentShader,
+                    .pName = "main",
+                    .pSpecializationInfo = nullptr,
+            },
+    };
     const VkViewport viewports = {
             .x = 0.0F,
             .y = 0.0F,
@@ -943,14 +946,23 @@ void VkHelper::createGraphicsPipeline() {
     };
     const VkVertexInputBindingDescription vertexInputBindingDescription = {
             .binding = 0,
-            .stride = 3 * sizeof(float),
+            .stride = 5 * sizeof(float),
             .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     };
-    const VkVertexInputAttributeDescription vertexInputAttributeDescription = {
-            .location = 0,
-            .binding = 0,
-            .format = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset = 0,
+    const VkVertexInputAttributeDescription vertexInputAttributeDescriptions[2] = {
+            {
+                    .location = 0,
+                    .binding = 0,
+                    .format = VK_FORMAT_R32G32B32_SFLOAT,
+                    .offset = 0,
+            },
+            {
+
+                    .location = 1,
+                    .binding = 0,
+                    .format = VK_FORMAT_R32G32_SFLOAT,
+                    .offset = sizeof(float) * 3,
+            },
     };
     const VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -958,8 +970,8 @@ void VkHelper::createGraphicsPipeline() {
             .flags = 0,
             .vertexBindingDescriptionCount = 1,
             .pVertexBindingDescriptions = &vertexInputBindingDescription,
-            .vertexAttributeDescriptionCount = 1,
-            .pVertexAttributeDescriptions = &vertexInputAttributeDescription,
+            .vertexAttributeDescriptionCount = 2,
+            .pVertexAttributeDescriptions = vertexInputAttributeDescriptions,
     };
     const VkGraphicsPipelineCreateInfo pipelineCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -1083,10 +1095,10 @@ void VkHelper::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     createInstance();
     createDevice();
     createSwapchain(window);
-    createRenderPass();
-    createGraphicsPipeline();
     createTextures();
     createDescriptorSet();
+    createRenderPass();
+    createGraphicsPipeline();
     createVertexBuffer();
     createCommandBuffers();
     createSemaphores();
@@ -1186,24 +1198,13 @@ void VkHelper::recordCommandBuffer(uint32_t index) {
 
     mCmdBindPipeline(mCommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
 
+    mCmdBindDescriptorSets(mCommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayout,
+                           0, 1, &mDescriptorSet, 0, nullptr);
+
     VkDeviceSize offset = 0;
     mCmdBindVertexBuffers(mCommandBuffers[index], 0, 1, &mVertexBuffer, &offset);
 
-    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                      3 * sizeof(float), &fragData[0]);
     mCmdDraw(mCommandBuffers[index], 4, 1, 0, 0);
-
-    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                      3 * sizeof(float), &fragData[3]);
-    mCmdDraw(mCommandBuffers[index], 4, 1, 2, 0);
-
-    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                      3 * sizeof(float), &fragData[6]);
-    mCmdDraw(mCommandBuffers[index], 4, 1, 6, 0);
-
-    mCmdPushConstants(mCommandBuffers[index], mPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                      3 * sizeof(float), &fragData[9]);
-    mCmdDraw(mCommandBuffers[index], 4, 1, 8, 0);
 
     mCmdEndRenderPass(mCommandBuffers[index]);
 

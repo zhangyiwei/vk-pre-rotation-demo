@@ -6,8 +6,6 @@
 
 #include <vector>
 
-struct Texture;
-
 class VkHelper {
 private:
     struct Texture {
@@ -87,6 +85,7 @@ private:
     PFN_vkBindBufferMemory mBindBufferMemory = nullptr;
     PFN_vkBindImageMemory mBindImageMemory = nullptr;
     PFN_vkCmdBeginRenderPass mCmdBeginRenderPass = nullptr;
+    PFN_vkCmdBindDescriptorSets mCmdBindDescriptorSets = nullptr;
     PFN_vkCmdBindPipeline mCmdBindPipeline = nullptr;
     PFN_vkCmdBindVertexBuffers mCmdBindVertexBuffers = nullptr;
     PFN_vkCmdCopyImage mCmdCopyImage = nullptr;
@@ -179,11 +178,6 @@ private:
     std::vector<VkSemaphore> mRenderSemaphores;
 
     // App specific constants
-    static constexpr const uint32_t kReqImageCount = 3;
-    static constexpr const uint32_t kTextureCount = 1;
-    static constexpr const char* kTextureFiles[kTextureCount] = {
-            "sample_tex.png",
-    };
     static constexpr const char* kRequiredInstanceExtensions[2] = {
             "VK_KHR_surface",
             "VK_KHR_android_surface",
@@ -191,26 +185,19 @@ private:
     static constexpr const char* kRequiredDeviceExtensions[1] = {
             "VK_KHR_swapchain",
     };
-    // clang-format off
-    static constexpr const float vertexData[36] = {
-            -1.0F, -1.0F,  0.0F, // LT
-            -1.0F,  0.0F,  0.0F, // LC
-             0.0F, -1.0F,  0.0F, // CT
-             0.0F,  0.0F,  0.0F, // CC
-             1.0F, -1.0F,  0.0F, // RT
-             1.0F,  0.0F,  0.0F, // RC
-            -1.0F,  0.0F,  0.0F, // LC
-            -1.0F,  1.0F,  0.0F, // LB
-             0.0F,  0.0F,  0.0F, // CC
-             0.0F,  1.0F,  0.0F, // CB
-             1.0F,  0.0F,  0.0F, // RC
-             1.0F,  1.0F,  0.0F, // RB
+    static constexpr const uint32_t kReqImageCount = 3;
+    static constexpr const uint32_t kTextureCount = 1;
+    static constexpr const char* kTextureFiles[kTextureCount] = {
+            "sample_tex.png",
     };
-    static constexpr const float fragData[12] = {
-            1.0F, 0.0F, 0.0F, // Red
-            0.0F, 1.0F, 0.0F, // Green
-            0.0F, 0.0F, 1.0F, // Blue
-            1.0F, 1.0F, 0.0F, // Yellow
+    static constexpr const char* kVertexShaderFile = "texture.vert.spv";
+    static constexpr const char* kFragmentShaderFile = "texture.frag.spv";
+    // clang-format off
+    static constexpr const float vertexData[20] = {
+            -1.0F, -1.0F, 0.0F, 0.0F, 0.0F, // LT
+            -1.0F,  1.0F, 0.0F, 0.0F, 1.0F, // LB
+             1.0F, -1.0F, 0.0F, 1.0F, 0.0F, // RT
+             1.0F,  1.0F, 0.0F, 1.0F, 1.0F, // RB
     };
     // clang-format on
 };
