@@ -20,6 +20,155 @@
     m##F = reinterpret_cast<PFN_vk##F>(vkGetInstanceProcAddr(mInstance, "vk" #F))
 #define GET_DEV_PROC(F) m##F = reinterpret_cast<PFN_vk##F>(mGetDeviceProcAddr(mDevice, "vk" #F))
 
+/* public APIs start here */
+void VkHelper::initialize(ANativeWindow* window, AAssetManager* assetManager) {
+    ASSERT(assetManager);
+    mAssetManager = assetManager;
+
+    createInstance();
+    createDevice();
+    createSwapchain(window);
+    createTextures();
+    createDescriptorSet();
+    createRenderPass();
+    createGraphicsPipeline();
+    createVertexBuffer();
+    createCommandBuffers();
+    createSemaphores();
+
+    mIsReady.store(true);
+}
+
+void VkHelper::drawFrame() {
+    if (!mIsReady.load()) {
+        ALOGD("Vulkan is not ready yet");
+        return;
+    }
+
+    VkSemaphore currentAcquireSemaphore = mFreeAcquireSemaphore;
+    VkSemaphore currentRenderSemaphore = mFreeRenderSemaphore;
+
+    uint32_t index;
+    ASSERT(mAcquireNextImageKHR(mDevice, mSwapchain, UINT64_MAX, currentAcquireSemaphore,
+                                VK_NULL_HANDLE, &index) == VK_SUCCESS);
+
+    if (mFramebuffers[index] == VK_NULL_HANDLE) {
+        createFramebuffer(index);
+    }
+
+    recordCommandBuffer(index);
+
+    VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    const VkSubmitInfo submitInfo = {
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = nullptr,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &currentAcquireSemaphore,
+            .pWaitDstStageMask = &waitStageMask,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &mCommandBuffers[index],
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = &currentRenderSemaphore,
+    };
+    ASSERT(mQueueSubmit(mQueue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS);
+
+    const VkPresentInfoKHR presentInfo = {
+            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .pNext = nullptr,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &currentRenderSemaphore,
+            .swapchainCount = 1,
+            .pSwapchains = &mSwapchain,
+            .pImageIndices = &index,
+            .pResults = nullptr,
+    };
+    VkResult ret = mQueuePresentKHR(mQueue, &presentInfo);
+    ASSERT(ret == VK_SUCCESS || ret == VK_SUBOPTIMAL_KHR);
+
+    mFreeAcquireSemaphore = mAcquireSemaphores[index];
+    mAcquireSemaphores[index] = currentAcquireSemaphore;
+
+    mFreeRenderSemaphore = mRenderSemaphores[index];
+    mRenderSemaphores[index] = currentRenderSemaphore;
+
+    // ALOGD("Successfully draw a frame[SUBOPTIMAL(%u)]", ret == VK_SUBOPTIMAL_KHR);
+}
+
+void VkHelper::destroy() {
+    if (mDevice != VK_NULL_HANDLE) {
+        mDeviceWaitIdle(mDevice);
+
+        for (auto& imageView : mImageViews) {
+            mDestroyImageView(mDevice, imageView, nullptr);
+        }
+        mImageViews.clear();
+
+        for (auto& framebuffer : mFramebuffers) {
+            mDestroyFramebuffer(mDevice, framebuffer, nullptr);
+        }
+        mFramebuffers.clear();
+
+        mDestroySemaphore(mDevice, mFreeAcquireSemaphore, nullptr);
+        mFreeAcquireSemaphore = VK_NULL_HANDLE;
+        for (auto& semaphore : mAcquireSemaphores) {
+            mDestroySemaphore(mDevice, semaphore, nullptr);
+        }
+
+        mDestroySemaphore(mDevice, mFreeRenderSemaphore, nullptr);
+        mFreeRenderSemaphore = VK_NULL_HANDLE;
+        for (auto& semaphore : mRenderSemaphores) {
+            mDestroySemaphore(mDevice, semaphore, nullptr);
+        }
+
+        if (!mCommandBuffers.empty()) {
+            mFreeCommandBuffers(mDevice, mCommandPool, mCommandBuffers.size(),
+                                mCommandBuffers.data());
+        }
+        mCommandBuffers.clear();
+        mDestroyCommandPool(mDevice, mCommandPool, nullptr);
+        mCommandPool = VK_NULL_HANDLE;
+
+        mDestroyBuffer(mDevice, mVertexBuffer, nullptr);
+        mVertexBuffer = VK_NULL_HANDLE;
+        mFreeMemory(mDevice, mDeviceMemory, nullptr);
+        mDeviceMemory = VK_NULL_HANDLE;
+
+        mDestroyPipeline(mDevice, mPipeline, nullptr);
+        mPipeline = VK_NULL_HANDLE;
+        mDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
+        mPipelineLayout = VK_NULL_HANDLE;
+
+        mDestroyRenderPass(mDevice, mRenderPass, nullptr);
+        mRenderPass = VK_NULL_HANDLE;
+
+        mFreeDescriptorSets(mDevice, mDescriptorPool, 1, &mDescriptorSet);
+        mDestroyDescriptorPool(mDevice, mDescriptorPool, nullptr);
+        mDestroyDescriptorSetLayout(mDevice, mDescriptorSetLayout, nullptr);
+
+        for (auto& texture : mTextures) {
+            mDestroyImageView(mDevice, texture.view, nullptr);
+            mDestroySampler(mDevice, texture.sampler, nullptr);
+            mDestroyImage(mDevice, texture.image, nullptr);
+            mFreeMemory(mDevice, texture.memory, nullptr);
+        }
+        mTextures.clear();
+
+        mDestroySwapchainKHR(mDevice, mSwapchain, nullptr);
+
+        mDestroyDevice(mDevice, nullptr);
+        mDevice = VK_NULL_HANDLE;
+    }
+
+    if (mInstance) {
+        mDestroySurfaceKHR(mInstance, mSurface, nullptr);
+        mSurface = VK_NULL_HANDLE;
+
+        mDestroyInstance(mInstance, nullptr);
+        mInstance = VK_NULL_HANDLE;
+    }
+}
+
+/* private APIs start here */
 static bool hasExtension(const char* extension_name,
                          const std::vector<VkExtensionProperties>& extensions) {
     return std::find_if(extensions.cbegin(), extensions.cend(),
@@ -164,7 +313,6 @@ void VkHelper::createDevice() {
     GET_DEV_PROC(CmdDraw);
     GET_DEV_PROC(CmdEndRenderPass);
     GET_DEV_PROC(CmdPipelineBarrier);
-    GET_DEV_PROC(CmdPushConstants);
     GET_DEV_PROC(CreateBuffer);
     GET_DEV_PROC(CreateCommandPool);
     GET_DEV_PROC(CreateDescriptorPool);
@@ -182,6 +330,8 @@ void VkHelper::createDevice() {
     GET_DEV_PROC(CreateSwapchainKHR);
     GET_DEV_PROC(DestroyBuffer);
     GET_DEV_PROC(DestroyCommandPool);
+    GET_DEV_PROC(DestroyDescriptorPool);
+    GET_DEV_PROC(DestroyDescriptorSetLayout);
     GET_DEV_PROC(DestroyDevice);
     GET_DEV_PROC(DestroyFence);
     GET_DEV_PROC(DestroyFramebuffer);
@@ -190,12 +340,14 @@ void VkHelper::createDevice() {
     GET_DEV_PROC(DestroyPipeline);
     GET_DEV_PROC(DestroyPipelineLayout);
     GET_DEV_PROC(DestroyRenderPass);
+    GET_DEV_PROC(DestroySampler);
     GET_DEV_PROC(DestroySemaphore);
     GET_DEV_PROC(DestroyShaderModule);
     GET_DEV_PROC(DestroySwapchainKHR);
     GET_DEV_PROC(DeviceWaitIdle);
     GET_DEV_PROC(EndCommandBuffer);
     GET_DEV_PROC(FreeCommandBuffers);
+    GET_DEV_PROC(FreeDescriptorSets);
     GET_DEV_PROC(FreeMemory);
     GET_DEV_PROC(GetBufferMemoryRequirements);
     GET_DEV_PROC(GetDeviceQueue);
@@ -556,8 +708,9 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
         mGetImageMemoryRequirements(mDevice, outTexture->image, &memoryRequirements);
 
         memoryAllocateInfo.allocationSize = memoryRequirements.size;
-        typeIndex = getMemoryTypeIndex(memoryRequirements.memoryTypeBits,
-                                       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        memoryAllocateInfo.memoryTypeIndex =
+                getMemoryTypeIndex(memoryRequirements.memoryTypeBits,
+                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
         ASSERT(mAllocateMemory(mDevice, &memoryAllocateInfo, nullptr, &outTexture->memory) ==
                VK_SUCCESS);
@@ -570,7 +723,7 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
         setImageLayout(commandBuffer, outTexture->image, VK_IMAGE_LAYOUT_UNDEFINED,
                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
                        VK_PIPELINE_STAGE_TRANSFER_BIT);
-        VkImageCopy bltInfo{
+        VkImageCopy bltInfo = {
                 .srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                 .srcSubresource.mipLevel = 0,
                 .srcSubresource.baseArrayLayer = 0,
@@ -694,7 +847,7 @@ void VkHelper::createTextures() {
 }
 
 void VkHelper::createDescriptorSet() {
-    const VkDescriptorSetLayoutBinding descriptorSetLayoutBinding{
+    const VkDescriptorSetLayoutBinding descriptorSetLayoutBinding = {
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = kTextureCount,
@@ -821,19 +974,14 @@ void VkHelper::createRenderPass() {
 }
 
 void VkHelper::createGraphicsPipeline() {
-    const VkPushConstantRange pushConstantRange = {
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .offset = 0,
-            .size = 3 * sizeof(float),
-    };
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .pNext = nullptr,
             .flags = 0,
             .setLayoutCount = 1,
             .pSetLayouts = &mDescriptorSetLayout,
-            .pushConstantRangeCount = 1,
-            .pPushConstantRanges = &pushConstantRange,
+            .pushConstantRangeCount = 0,
+            .pPushConstantRanges = nullptr,
     };
     ASSERT(mCreatePipelineLayout(mDevice, &pipelineLayoutCreateInfo, nullptr, &mPipelineLayout) ==
            VK_SUCCESS);
@@ -1091,24 +1239,6 @@ void VkHelper::createSemaphores() {
     ALOGD("Successfully created semaphores");
 }
 
-void VkHelper::initialize(ANativeWindow* window, AAssetManager* assetManager) {
-    ASSERT(assetManager);
-    mAssetManager = assetManager;
-
-    createInstance();
-    createDevice();
-    createSwapchain(window);
-    createTextures();
-    createDescriptorSet();
-    createRenderPass();
-    createGraphicsPipeline();
-    createVertexBuffer();
-    createCommandBuffers();
-    createSemaphores();
-
-    mIsReady.store(true);
-}
-
 void VkHelper::createImageView(uint32_t index) {
     const VkImageViewCreateInfo imageViewCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -1212,126 +1342,4 @@ void VkHelper::recordCommandBuffer(uint32_t index) {
     mCmdEndRenderPass(mCommandBuffers[index]);
 
     ASSERT(mEndCommandBuffer(mCommandBuffers[index]) == VK_SUCCESS);
-}
-
-void VkHelper::drawFrame() {
-    if (!mIsReady.load()) {
-        ALOGD("Vulkan is not ready yet");
-        return;
-    }
-
-    VkSemaphore currentAcquireSemaphore = mFreeAcquireSemaphore;
-    VkSemaphore currentRenderSemaphore = mFreeRenderSemaphore;
-
-    uint32_t index;
-    ASSERT(mAcquireNextImageKHR(mDevice, mSwapchain, UINT64_MAX, currentAcquireSemaphore,
-                                VK_NULL_HANDLE, &index) == VK_SUCCESS);
-
-    if (mFramebuffers[index] == VK_NULL_HANDLE) {
-        createFramebuffer(index);
-    }
-
-    recordCommandBuffer(index);
-
-    VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    const VkSubmitInfo submitInfo = {
-            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            .pNext = nullptr,
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &currentAcquireSemaphore,
-            .pWaitDstStageMask = &waitStageMask,
-            .commandBufferCount = 1,
-            .pCommandBuffers = &mCommandBuffers[index],
-            .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &currentRenderSemaphore,
-    };
-    ASSERT(mQueueSubmit(mQueue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS);
-
-    const VkPresentInfoKHR presentInfo = {
-            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-            .pNext = nullptr,
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &currentRenderSemaphore,
-            .swapchainCount = 1,
-            .pSwapchains = &mSwapchain,
-            .pImageIndices = &index,
-            .pResults = nullptr,
-    };
-    VkResult ret = mQueuePresentKHR(mQueue, &presentInfo);
-    ASSERT(ret == VK_SUCCESS || ret == VK_SUBOPTIMAL_KHR);
-
-    mFreeAcquireSemaphore = mAcquireSemaphores[index];
-    mAcquireSemaphores[index] = currentAcquireSemaphore;
-
-    mFreeRenderSemaphore = mRenderSemaphores[index];
-    mRenderSemaphores[index] = currentRenderSemaphore;
-
-    // ALOGD("Successfully draw a frame[SUBOPTIMAL(%u)]", ret == VK_SUBOPTIMAL_KHR);
-}
-
-void VkHelper::destroy() {
-    if (mDevice != VK_NULL_HANDLE) {
-        mDeviceWaitIdle(mDevice);
-
-        for (auto& imageView : mImageViews) {
-            mDestroyImageView(mDevice, imageView, nullptr);
-        }
-        mImageViews.clear();
-
-        for (auto& framebuffer : mFramebuffers) {
-            mDestroyFramebuffer(mDevice, framebuffer, nullptr);
-        }
-        mFramebuffers.clear();
-
-        mDestroySemaphore(mDevice, mFreeAcquireSemaphore, nullptr);
-        mFreeAcquireSemaphore = VK_NULL_HANDLE;
-        for (auto& semaphore : mAcquireSemaphores) {
-            mDestroySemaphore(mDevice, semaphore, nullptr);
-        }
-
-        mDestroySemaphore(mDevice, mFreeRenderSemaphore, nullptr);
-        mFreeRenderSemaphore = VK_NULL_HANDLE;
-        for (auto& semaphore : mRenderSemaphores) {
-            mDestroySemaphore(mDevice, semaphore, nullptr);
-        }
-
-        if (!mCommandBuffers.empty()) {
-            mFreeCommandBuffers(mDevice, mCommandPool, mCommandBuffers.size(),
-                                mCommandBuffers.data());
-        }
-        mCommandBuffers.clear();
-        mDestroyCommandPool(mDevice, mCommandPool, nullptr);
-        mCommandPool = VK_NULL_HANDLE;
-
-        mDestroyBuffer(mDevice, mVertexBuffer, nullptr);
-        mVertexBuffer = VK_NULL_HANDLE;
-        mFreeMemory(mDevice, mDeviceMemory, nullptr);
-        mDeviceMemory = VK_NULL_HANDLE;
-
-        // TODO: Destroy texture related resources
-        // TODO: Destroy descriptor set and pool
-
-        mDestroyPipeline(mDevice, mPipeline, nullptr);
-        mPipeline = VK_NULL_HANDLE;
-        mDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
-        mPipelineLayout = VK_NULL_HANDLE;
-
-        // TODO: Destroy descriptor set layout
-
-        mDestroyRenderPass(mDevice, mRenderPass, nullptr);
-        mRenderPass = VK_NULL_HANDLE;
-
-        mDestroySwapchainKHR(mDevice, mSwapchain, nullptr);
-
-        mDestroyDevice(mDevice, nullptr);
-        mDevice = VK_NULL_HANDLE;
-    }
-
-    if (mInstance) {
-        mDestroySurfaceKHR(mInstance, mSurface, nullptr);
-        mSurface = VK_NULL_HANDLE;
-
-        mDestroyInstance(mInstance, nullptr);
-        mInstance = VK_NULL_HANDLE;
-    }
 }

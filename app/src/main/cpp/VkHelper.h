@@ -92,7 +92,6 @@ private:
     PFN_vkCmdDraw mCmdDraw = nullptr;
     PFN_vkCmdEndRenderPass mCmdEndRenderPass = nullptr;
     PFN_vkCmdPipelineBarrier mCmdPipelineBarrier = nullptr;
-    PFN_vkCmdPushConstants mCmdPushConstants = nullptr;
     PFN_vkCreateBuffer mCreateBuffer = nullptr;
     PFN_vkCreateCommandPool mCreateCommandPool = nullptr;
     PFN_vkCreateDescriptorPool mCreateDescriptorPool = nullptr;
@@ -110,6 +109,8 @@ private:
     PFN_vkCreateSwapchainKHR mCreateSwapchainKHR = nullptr;
     PFN_vkDestroyBuffer mDestroyBuffer = nullptr;
     PFN_vkDestroyCommandPool mDestroyCommandPool = nullptr;
+    PFN_vkDestroyDescriptorPool mDestroyDescriptorPool = nullptr;
+    PFN_vkDestroyDescriptorSetLayout mDestroyDescriptorSetLayout = nullptr;
     PFN_vkDestroyDevice mDestroyDevice = nullptr;
     PFN_vkDestroyFence mDestroyFence = nullptr;
     PFN_vkDestroyFramebuffer mDestroyFramebuffer = nullptr;
@@ -118,12 +119,14 @@ private:
     PFN_vkDestroyPipeline mDestroyPipeline = nullptr;
     PFN_vkDestroyPipelineLayout mDestroyPipelineLayout = nullptr;
     PFN_vkDestroyRenderPass mDestroyRenderPass = nullptr;
+    PFN_vkDestroySampler mDestroySampler = nullptr;
     PFN_vkDestroySemaphore mDestroySemaphore = nullptr;
     PFN_vkDestroyShaderModule mDestroyShaderModule = nullptr;
     PFN_vkDestroySwapchainKHR mDestroySwapchainKHR = nullptr;
     PFN_vkDeviceWaitIdle mDeviceWaitIdle = nullptr;
     PFN_vkEndCommandBuffer mEndCommandBuffer = nullptr;
     PFN_vkFreeCommandBuffers mFreeCommandBuffers = nullptr;
+    PFN_vkFreeDescriptorSets mFreeDescriptorSets = nullptr;
     PFN_vkFreeMemory mFreeMemory = nullptr;
     PFN_vkGetBufferMemoryRequirements mGetBufferMemoryRequirements = nullptr;
     PFN_vkGetDeviceQueue mGetDeviceQueue = nullptr;
