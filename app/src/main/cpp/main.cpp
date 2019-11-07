@@ -19,26 +19,28 @@ struct Engine {
     int animating;
     struct State state;
     VkHelper vk;
+    uint64_t count;
 
-    Engine() : app(nullptr), animating(0), state(), vk() {}
+    Engine() : app(nullptr), animating(0), state(), vk(), count(0) {}
 };
 
 static void engineInitDisplay(struct Engine* engine) {
     ALOGD("%s", __FUNCTION__);
+    engine->count = 0;
     engine->vk.initialize(engine->app->window, engine->app->activity->assetManager);
 }
 
 static void engineDrawFrame(struct Engine* engine) {
-    static uint64_t count = 0;
     engine->vk.drawFrame();
-    if (++count % 100 == 0) {
-        ALOGD("%s[%" PRIu64 "]", __FUNCTION__, count);
+    if (++engine->count % 100 == 0) {
+        ALOGD("%s[%" PRIu64 "]", __FUNCTION__, engine->count);
     }
 }
 
 static void engineTermDisplay(struct Engine* engine) {
     ALOGD("%s", __FUNCTION__);
     engine->animating = 0;
+    engine->count = 0;
     engine->vk.destroy();
 }
 

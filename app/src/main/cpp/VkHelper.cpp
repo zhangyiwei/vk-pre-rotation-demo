@@ -430,11 +430,13 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
         needBlit = false;
     }
 
+    uint32_t imageWidth = 0;
+    uint32_t imageHeight = 0;
     uint32_t channel = 0;
-    unsigned char* imageData =
+    uint8_t* imageData =
             stbi_load_from_memory((const stbi_uc*)file.data(), file.size(),
-                                  reinterpret_cast<int*>(&outTexture->width),
-                                  reinterpret_cast<int*>(&outTexture->height),
+                                  reinterpret_cast<int*>(&imageWidth),
+                                  reinterpret_cast<int*>(&imageHeight),
                                   reinterpret_cast<int*>(&channel), 4 /*desired_channels*/);
     ASSERT(channel == 4);
 
@@ -446,8 +448,8 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
             .format = VK_FORMAT_R8G8B8A8_UNORM,
             .extent =
                     {
-                            .width = outTexture->width,
-                            .height = outTexture->height,
+                            .width = imageWidth,
+                            .height = imageHeight,
                             .depth = 1,
                     },
             .mipLevels = 1,
@@ -485,18 +487,15 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
     VkSubresourceLayout subresourceLayout;
     mGetImageSubresourceLayout(mDevice, outTexture->image, &imageSubresource, &subresourceLayout);
 
-    void* data;
+    void* textureData;
     ASSERT(mMapMemory(mDevice, outTexture->memory, 0, memoryAllocateInfo.allocationSize, 0,
-                      &data) == VK_SUCCESS);
+                      &textureData) == VK_SUCCESS);
 
-    for (int32_t y = 0; y < outTexture->height; y++) {
-        auto row = (unsigned char*)data + subresourceLayout.rowPitch * y;
-        for (int32_t x = 0; x < outTexture->width; x++) {
-            row[x * 4] = imageData[(x + y * outTexture->width) * 4];
-            row[x * 4 + 1] = imageData[(x + y * outTexture->width) * 4 + 1];
-            row[x * 4 + 2] = imageData[(x + y * outTexture->width) * 4 + 2];
-            row[x * 4 + 3] = imageData[(x + y * outTexture->width) * 4 + 3];
+    for (uint32_t row = 0, srcPos = 0, cols = 4 * imageWidth; row < imageHeight; row++) {
+        for (uint32_t col = 0; col < cols; col++) {
+            ((uint8_t*)textureData)[col] = imageData[srcPos++];
         }
+        textureData = (uint8_t*)textureData + subresourceLayout.rowPitch;
     }
 
     mUnmapMemory(mDevice, outTexture->memory);
@@ -586,8 +585,8 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
                 .dstOffset.x = 0,
                 .dstOffset.y = 0,
                 .dstOffset.z = 0,
-                .extent.width = outTexture->width,
-                .extent.height = outTexture->height,
+                .extent.width = imageWidth,
+                .extent.height = imageHeight,
                 .extent.depth = 1,
         };
         mCmdCopyImage(commandBuffer, stageImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -628,6 +627,10 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
         mDestroyImage(mDevice, stageImage, nullptr);
         mFreeMemory(mDevice, stageMemory, nullptr);
     }
+
+    // record the image's original dimensions so we can respect it later
+    outTexture->width = imageWidth;
+    outTexture->height = imageHeight;
 
     ALOGD("Successfully loaded texture from %s", filePath);
 }
