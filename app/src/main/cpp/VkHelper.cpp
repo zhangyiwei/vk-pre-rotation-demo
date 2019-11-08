@@ -22,8 +22,6 @@
 
 /* public APIs start here */
 void VkHelper::initialize(ANativeWindow* window, AAssetManager* assetManager) {
-    std::lock_guard<std::mutex> lock(mMutex);
-
     ASSERT(assetManager);
     mAssetManager = assetManager;
 
@@ -46,8 +44,6 @@ void VkHelper::drawFrame() {
         ALOGD("Vulkan is not ready yet");
         return;
     }
-
-    std::lock_guard<std::mutex> lock(mMutex);
 
     VkSemaphore currentAcquireSemaphore = mFreeAcquireSemaphore;
     VkSemaphore currentRenderSemaphore = mFreeRenderSemaphore;
@@ -99,8 +95,6 @@ void VkHelper::drawFrame() {
 }
 
 void VkHelper::destroy() {
-    std::lock_guard<std::mutex> lock(mMutex);
-
     if (mDevice != VK_NULL_HANDLE) {
         mDeviceWaitIdle(mDevice);
 
