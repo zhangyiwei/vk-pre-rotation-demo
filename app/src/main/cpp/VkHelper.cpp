@@ -1,17 +1,10 @@
 #include "VkHelper.h"
 
-#include <android/log.h>
-
-#include "glm/glm.hpp"
+#include <glm/glm.hpp>
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
+#include <stb/stb_image.h>
 
-#define LOG_TAG "VKDEMO"
-#define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define ASSERT(cond)                                                                           \
-    if (!(cond)) {                                                                             \
-        __android_log_assert(#cond, LOG_TAG, "Error: " #cond " at " __FILE__ ":%d", __LINE__); \
-    }
+#include "Utils.h"
 
 #define GET_PROC(F) \
     m##F = reinterpret_cast<PFN_vk##F>(vkGetInstanceProcAddr(VK_NULL_HANDLE, "vk" #F))

@@ -1,120 +1,8 @@
 #include <android/log.h>
 #include <android_native_app_glue.h>
 
-#include <mutex>
-
-#include "VkHelper.h"
-
-#define ALOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, "VKDEMO", __VA_ARGS__))
-
-class Engine {
-private:
-    struct State {
-        int32_t inputX;
-        int32_t inputY;
-        uint64_t frameCount;
-
-        State() : inputX(0), inputY(0), frameCount(0) {}
-    };
-
-public:
-    explicit Engine() : mIsAnimating(false) {}
-    bool isAnimating();
-    void drawFrame();
-    void onInitWindow(ANativeWindow* window, AAssetManager* assetManager);
-    void onLostFocus();
-    void onGainedFocus();
-    void onTermWindow();
-    void onSaveState(void** outSavedState, size_t* outSize);
-    void onStart(void* savedState);
-    int32_t onInputEvent(AInputEvent* event);
-
-private:
-    // mLock protects all members below
-    std::mutex mLock;
-    State mState;
-    VkHelper mVkHelper;
-    bool mIsAnimating;
-
-    // Engine constants
-    static constexpr const uint64_t kLogInterval = 100;
-};
-
-bool Engine::isAnimating() {
-    std::lock_guard<std::mutex> lock(mLock);
-    return mIsAnimating;
-}
-
-void Engine::drawFrame() {
-    std::lock_guard<std::mutex> lock(mLock);
-    if (!mIsAnimating) {
-        return;
-    }
-
-    mVkHelper.drawFrame();
-
-    if (++mState.frameCount % kLogInterval == 0) {
-        ALOGD("%s[%" PRIu64 "]", __FUNCTION__, mState.frameCount);
-    }
-}
-
-void Engine::onInitWindow(ANativeWindow* window, AAssetManager* assetManager) {
-    std::lock_guard<std::mutex> lock(mLock);
-    ALOGD("%s", __FUNCTION__);
-    mVkHelper.initialize(window, assetManager);
-}
-
-void Engine::onLostFocus() {
-    std::lock_guard<std::mutex> lock(mLock);
-    ALOGD("%s", __FUNCTION__);
-    mIsAnimating = false;
-}
-
-void Engine::onGainedFocus() {
-    std::lock_guard<std::mutex> lock(mLock);
-    ALOGD("%s", __FUNCTION__);
-    mIsAnimating = true;
-}
-
-void Engine::onTermWindow() {
-    std::lock_guard<std::mutex> lock(mLock);
-    ALOGD("%s", __FUNCTION__);
-    mIsAnimating = false;
-    mVkHelper.destroy();
-}
-
-void Engine::onSaveState(void** outSavedState, size_t* outSize) {
-    std::lock_guard<std::mutex> lock(mLock);
-    ALOGD("%s", __FUNCTION__);
-    *outSize = sizeof(State);
-    *outSavedState = malloc(*outSize);
-    memcpy(*outSavedState, &mState, *outSize);
-}
-
-void Engine::onStart(void* savedState) {
-    std::lock_guard<std::mutex> lock(mLock);
-    ALOGD("%s", __FUNCTION__);
-    if (savedState) {
-        memcpy(&mState, savedState, sizeof(State));
-        ALOGD("Restored from previous saved state");
-    }
-}
-
-int32_t Engine::onInputEvent(AInputEvent* event) {
-    std::lock_guard<std::mutex> lock(mLock);
-    if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
-        mState.inputX = static_cast<int32_t>(AMotionEvent_getX(event, 0));
-        mState.inputY = static_cast<int32_t>(AMotionEvent_getY(event, 0));
-        ALOGD("AINPUT_EVENT_TYPE_MOTION X[%d] Y[%d]", mState.inputX, mState.inputY);
-        return 1;
-    }
-    return 0;
-}
-
-static int32_t handleInputEvent(android_app* app, AInputEvent* event) {
-    ALOGD("%s", __FUNCTION__);
-    return static_cast<Engine*>(app->userData)->onInputEvent(event);
-}
+#include "Engine.h"
+#include "Utils.h"
 
 static void handleAppCmd(android_app* app, int32_t cmd) {
     ALOGD("%s", __FUNCTION__);
@@ -180,6 +68,11 @@ static void handleAppCmd(android_app* app, int32_t cmd) {
             ALOGD("UNKNOWN CMD[%d]", cmd);
             break;
     }
+}
+
+static int32_t handleInputEvent(android_app* app, AInputEvent* event) {
+    ALOGD("%s", __FUNCTION__);
+    return static_cast<Engine*>(app->userData)->onInputEvent(event);
 }
 
 static void handleNativeWindowResized(ANativeActivity* activity, ANativeWindow* window) {

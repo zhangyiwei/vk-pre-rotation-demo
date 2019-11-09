@@ -1,7 +1,6 @@
 #pragma once
 
-#include <android/asset_manager.h>
-#include <android/native_window.h>
+#include <android_native_app_glue.h>
 #include <vulkan/vulkan.h>
 
 #include <vector>
