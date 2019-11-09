@@ -1,7 +1,6 @@
 #include "VkHelper.h"
 
 #include <android/log.h>
-#include <unistd.h>
 
 #include "glm/glm.hpp"
 #define STB_IMAGE_IMPLEMENTATION

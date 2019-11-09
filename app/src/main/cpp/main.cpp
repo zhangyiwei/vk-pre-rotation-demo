@@ -9,22 +9,23 @@
 #define ALOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, "VKDEMO", __VA_ARGS__))
 
 struct State {
-    float angle;
-    int32_t x;
-    int32_t y;
+    int32_t inputX;
+    int32_t inputY;
 
-    State() : angle(0), x(0), y(0) {}
+    State() : inputX(0), inputY(0) {}
 };
 
 struct Engine {
     android_app* app;
+
+    // this lock protects all fields below
+    std::mutex lock;
     State state;
     VkHelper vk;
     bool animating;
     uint64_t count;
-    std::mutex lock;
 
-    Engine() : app(nullptr), state(), vk(), animating(false), count(0) {}
+    Engine() : app(nullptr), lock(), state(), vk(), animating(false), count(0) {}
 };
 
 static bool engineIsAnimating(Engine* engine) {
@@ -91,8 +92,8 @@ static int32_t engineUpdateState(Engine* engine, AInputEvent* event) {
     std::lock_guard<std::mutex> lock(engine->lock);
     ALOGD("%s", __FUNCTION__);
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
-        engine->state.x = static_cast<int32_t>(AMotionEvent_getX(event, 0));
-        engine->state.y = static_cast<int32_t>(AMotionEvent_getY(event, 0));
+        engine->state.inputX = static_cast<int32_t>(AMotionEvent_getX(event, 0));
+        engine->state.inputY = static_cast<int32_t>(AMotionEvent_getY(event, 0));
         return 1;
     }
     return 0;
@@ -148,7 +149,7 @@ static void handleAppCmd(android_app* app, int32_t cmd) {
     }
 }
 
-static void onWindowResized(ANativeActivity* activity, ANativeWindow* window) {
+static void handleNativeWindowResized(ANativeActivity* activity, ANativeWindow* window) {
     ALOGD("%s", __FUNCTION__);
     (void)activity;
     (void)window;
@@ -165,7 +166,7 @@ void android_main(android_app* app) {
     app->userData = &engine;
     app->onAppCmd = handleAppCmd;
     app->onInputEvent = handleInputEvent;
-    app->activity->callbacks->onNativeWindowResized = onWindowResized;
+    app->activity->callbacks->onNativeWindowResized = handleNativeWindowResized;
 
     engine.app = app;
 
