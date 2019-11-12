@@ -564,15 +564,9 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
     std::vector<char> file = readFileFromAsset(mAssetManager, filePath, AASSET_MODE_BUFFER);
     ASSERT(!file.empty());
 
-    bool needBlit = true;
     VkFormatProperties formatProperties;
     mGetPhysicalDeviceFormatProperties(mGpu, VK_FORMAT_R8G8B8A8_UNORM, &formatProperties);
-    ASSERT((formatProperties.linearTilingFeatures | formatProperties.optimalTilingFeatures) &
-           VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
-
-    if (formatProperties.linearTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) {
-        needBlit = false;
-    }
+    ASSERT(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
 
     uint32_t imageWidth = 0;
     uint32_t imageHeight = 0;
@@ -584,6 +578,9 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
                                   reinterpret_cast<int*>(&channel), 4 /*desired_channels*/);
     ASSERT(channel == 4);
 
+    // create a stageImage and stageMemory for the original texture uploading
+    VkImage stageImage = VK_NULL_HANDLE;
+    VkDeviceMemory stageMemory = VK_NULL_HANDLE;
     VkImageCreateInfo imageCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
             .pNext = nullptr,
@@ -600,28 +597,27 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
             .arrayLayers = 1,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .tiling = VK_IMAGE_TILING_LINEAR,
-            .usage = (needBlit ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : VK_IMAGE_USAGE_SAMPLED_BIT),
+            .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
             .queueFamilyIndexCount = 1,
             .pQueueFamilyIndices = &mQueueFamilyIndex,
             .initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED,
     };
-    ASSERT(mCreateImage(mDevice, &imageCreateInfo, nullptr, &outTexture->image) == VK_SUCCESS);
+    ASSERT(mCreateImage(mDevice, &imageCreateInfo, nullptr, &stageImage) == VK_SUCCESS);
 
     VkMemoryRequirements memoryRequirements;
-    mGetImageMemoryRequirements(mDevice, outTexture->image, &memoryRequirements);
+    mGetImageMemoryRequirements(mDevice, stageImage, &memoryRequirements);
 
-    uint32_t typeIndex = getMemoryTypeIndex(memoryRequirements.memoryTypeBits,
-                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    const uint32_t typeIndex = getMemoryTypeIndex(memoryRequirements.memoryTypeBits,
+                                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
     VkMemoryAllocateInfo memoryAllocateInfo = {
             .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
             .pNext = nullptr,
             .allocationSize = memoryRequirements.size,
             .memoryTypeIndex = typeIndex,
     };
-    ASSERT(mAllocateMemory(mDevice, &memoryAllocateInfo, nullptr, &outTexture->memory) ==
-           VK_SUCCESS);
-    ASSERT(mBindImageMemory(mDevice, outTexture->image, outTexture->memory, 0) == VK_SUCCESS);
+    ASSERT(mAllocateMemory(mDevice, &memoryAllocateInfo, nullptr, &stageMemory) == VK_SUCCESS);
+    ASSERT(mBindImageMemory(mDevice, stageImage, stageMemory, 0) == VK_SUCCESS);
 
     const VkImageSubresource imageSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -629,10 +625,10 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
             .arrayLayer = 0,
     };
     VkSubresourceLayout subresourceLayout;
-    mGetImageSubresourceLayout(mDevice, outTexture->image, &imageSubresource, &subresourceLayout);
+    mGetImageSubresourceLayout(mDevice, stageImage, &imageSubresource, &subresourceLayout);
 
     void* textureData;
-    ASSERT(mMapMemory(mDevice, outTexture->memory, 0, memoryAllocateInfo.allocationSize, 0,
+    ASSERT(mMapMemory(mDevice, stageMemory, 0, memoryAllocateInfo.allocationSize, 0,
                       &textureData) == VK_SUCCESS);
 
     for (uint32_t row = 0, srcPos = 0, cols = 4 * imageWidth; row < imageHeight; row++) {
@@ -642,13 +638,27 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
         textureData = (uint8_t*)textureData + subresourceLayout.rowPitch;
     }
 
-    mUnmapMemory(mDevice, outTexture->memory);
+    mUnmapMemory(mDevice, stageMemory);
     stbi_image_free(imageData);
     file.clear();
 
-    outTexture->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    // Create a tile texture to blit into
+    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    ASSERT(mCreateImage(mDevice, &imageCreateInfo, nullptr, &outTexture->image) == VK_SUCCESS);
 
-    VkCommandPoolCreateInfo commandPoolCreateInfo{
+    mGetImageMemoryRequirements(mDevice, outTexture->image, &memoryRequirements);
+
+    memoryAllocateInfo.allocationSize = memoryRequirements.size;
+    memoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(memoryRequirements.memoryTypeBits,
+                                                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    ASSERT(mAllocateMemory(mDevice, &memoryAllocateInfo, nullptr, &outTexture->memory) ==
+           VK_SUCCESS);
+    ASSERT(mBindImageMemory(mDevice, outTexture->image, outTexture->memory, 0) == VK_SUCCESS);
+
+    VkCommandPoolCreateInfo commandPoolCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .pNext = nullptr,
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
@@ -669,80 +679,51 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
 
     ASSERT(mAllocateCommandBuffers(mDevice, &commandBufferAllocateInfo, &commandBuffer) ==
            VK_SUCCESS);
-    VkCommandBufferBeginInfo cmd_buf_info = {
+    VkCommandBufferBeginInfo commandBufferBeginInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             .pNext = nullptr,
             .flags = 0,
             .pInheritanceInfo = nullptr,
     };
-    ASSERT(mBeginCommandBuffer(commandBuffer, &cmd_buf_info) == VK_SUCCESS);
+    ASSERT(mBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) == VK_SUCCESS);
 
-    // If linear is supported, we are done
-    VkImage stageImage = VK_NULL_HANDLE;
-    VkDeviceMemory stageMemory = VK_NULL_HANDLE;
-    if (!needBlit) {
-        setImageLayout(commandBuffer, outTexture->image, VK_IMAGE_LAYOUT_PREINITIALIZED,
-                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
-                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-    } else {
-        // save current image and mem as staging image and memory
-        stageImage = outTexture->image;
-        stageMemory = outTexture->memory;
-        outTexture->image = VK_NULL_HANDLE;
-        outTexture->memory = VK_NULL_HANDLE;
+    setImageLayout(commandBuffer, stageImage, VK_IMAGE_LAYOUT_PREINITIALIZED,
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-        // Create a tile texture to blit into
-        imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        ASSERT(mCreateImage(mDevice, &imageCreateInfo, nullptr, &outTexture->image) == VK_SUCCESS);
+    // transitions image out of UNDEFINED type
+    setImageLayout(commandBuffer, outTexture->image, VK_IMAGE_LAYOUT_UNDEFINED,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-        mGetImageMemoryRequirements(mDevice, outTexture->image, &memoryRequirements);
+    VkImageCopy blitInfo = {
+            .srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .srcSubresource.mipLevel = 0,
+            .srcSubresource.baseArrayLayer = 0,
+            .srcSubresource.layerCount = 1,
+            .srcOffset.x = 0,
+            .srcOffset.y = 0,
+            .srcOffset.z = 0,
+            .dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .dstSubresource.mipLevel = 0,
+            .dstSubresource.baseArrayLayer = 0,
+            .dstSubresource.layerCount = 1,
+            .dstOffset.x = 0,
+            .dstOffset.y = 0,
+            .dstOffset.z = 0,
+            .extent.width = imageWidth,
+            .extent.height = imageHeight,
+            .extent.depth = 1,
+    };
+    mCmdCopyImage(commandBuffer, stageImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                  outTexture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blitInfo);
 
-        memoryAllocateInfo.allocationSize = memoryRequirements.size;
-        memoryAllocateInfo.memoryTypeIndex =
-                getMemoryTypeIndex(memoryRequirements.memoryTypeBits,
-                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-        ASSERT(mAllocateMemory(mDevice, &memoryAllocateInfo, nullptr, &outTexture->memory) ==
-               VK_SUCCESS);
-        ASSERT(mBindImageMemory(mDevice, outTexture->image, outTexture->memory, 0) == VK_SUCCESS);
-
-        // transitions image out of UNDEFINED type
-        setImageLayout(commandBuffer, stageImage, VK_IMAGE_LAYOUT_PREINITIALIZED,
-                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
-                       VK_PIPELINE_STAGE_TRANSFER_BIT);
-        setImageLayout(commandBuffer, outTexture->image, VK_IMAGE_LAYOUT_UNDEFINED,
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
-                       VK_PIPELINE_STAGE_TRANSFER_BIT);
-        VkImageCopy bltInfo = {
-                .srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .srcSubresource.mipLevel = 0,
-                .srcSubresource.baseArrayLayer = 0,
-                .srcSubresource.layerCount = 1,
-                .srcOffset.x = 0,
-                .srcOffset.y = 0,
-                .srcOffset.z = 0,
-                .dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .dstSubresource.mipLevel = 0,
-                .dstSubresource.baseArrayLayer = 0,
-                .dstSubresource.layerCount = 1,
-                .dstOffset.x = 0,
-                .dstOffset.y = 0,
-                .dstOffset.z = 0,
-                .extent.width = imageWidth,
-                .extent.height = imageHeight,
-                .extent.depth = 1,
-        };
-        mCmdCopyImage(commandBuffer, stageImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                      outTexture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bltInfo);
-
-        setImageLayout(commandBuffer, outTexture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-    }
+    setImageLayout(commandBuffer, outTexture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
     ASSERT(mEndCommandBuffer(commandBuffer) == VK_SUCCESS);
+
     VkFenceCreateInfo fenceInfo = {
             .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
             .pNext = nullptr,
@@ -768,10 +749,8 @@ void VkHelper::loadTextureFromFile(const char* filePath, Texture* outTexture) {
 
     mFreeCommandBuffers(mDevice, commandPool, 1, &commandBuffer);
     mDestroyCommandPool(mDevice, commandPool, nullptr);
-    if (stageImage != VK_NULL_HANDLE) {
-        mDestroyImage(mDevice, stageImage, nullptr);
-        mFreeMemory(mDevice, stageMemory, nullptr);
-    }
+    mDestroyImage(mDevice, stageImage, nullptr);
+    mFreeMemory(mDevice, stageMemory, nullptr);
 
     // record the image's original dimensions so we can respect it later
     outTexture->width = imageWidth;

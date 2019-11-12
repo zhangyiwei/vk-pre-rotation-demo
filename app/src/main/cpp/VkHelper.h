@@ -10,7 +10,6 @@ private:
     struct Texture {
         VkSampler sampler;
         VkImage image;
-        VkImageLayout imageLayout;
         VkDeviceMemory memory;
         VkImageView view;
         uint32_t width;
@@ -19,7 +18,6 @@ private:
         Texture()
               : sampler(VK_NULL_HANDLE),
                 image(VK_NULL_HANDLE),
-                imageLayout(VK_IMAGE_LAYOUT_UNDEFINED),
                 memory(VK_NULL_HANDLE),
                 view(VK_NULL_HANDLE),
                 width(0),
