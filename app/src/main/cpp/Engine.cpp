@@ -67,7 +67,7 @@ int32_t Engine::onInputEvent(AInputEvent* event) {
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
         mState.inputX = static_cast<int32_t>(AMotionEvent_getX(event, 0));
         mState.inputY = static_cast<int32_t>(AMotionEvent_getY(event, 0));
-        ALOGD("AINPUT_EVENT_TYPE_MOTION X[%d] Y[%d]", mState.inputX, mState.inputY);
+        ALOGD("%s: X[%d] Y[%d]", __FUNCTION__, mState.inputX, mState.inputY);
         return 1;
     }
     return 0;

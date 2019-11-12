@@ -76,9 +76,10 @@ static int32_t handleInputEvent(android_app* app, AInputEvent* event) {
 }
 
 static void handleNativeWindowResized(ANativeActivity* activity, ANativeWindow* window) {
-    ALOGD("%s", __FUNCTION__);
     (void)activity;
-    (void)window;
+    int32_t width = ANativeWindow_getWidth(window);
+    int32_t height = ANativeWindow_getHeight(window);
+    ALOGD("%s: W[%d], H[%d]", __FUNCTION__, width, height);
 }
 
 /**
