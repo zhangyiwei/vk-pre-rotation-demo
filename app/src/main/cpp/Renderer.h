@@ -53,16 +53,21 @@ private:
     void createFramebuffer(uint32_t index);
     void recordCommandBuffer(uint32_t index);
 
+    // Helper member for Vulkan entry points
     VkHelper mVk;
+    // Protects the order of initialize(...) and drawFrame()
     std::atomic<bool> mIsReady;
+    // A pointer to cache AAssetManager
     AAssetManager* mAssetManager = nullptr;
 
+    // Stable baseline members
     VkInstance mInstance = VK_NULL_HANDLE;
     VkPhysicalDevice mGpu = VK_NULL_HANDLE;
     VkDevice mDevice = VK_NULL_HANDLE;
     uint32_t mQueueFamilyIndex = 0;
     VkQueue mQueue = VK_NULL_HANDLE;
 
+    // Swapchain related members
     VkSurfaceKHR mSurface = VK_NULL_HANDLE;
     VkFormat mFormat = VK_FORMAT_UNDEFINED;
     uint32_t mWidth = 0;
@@ -74,20 +79,26 @@ private:
     std::vector<VkImageView> mImageViews;
     std::vector<VkFramebuffer> mFramebuffers;
 
+    // Graphics pipeline related members
     VkRenderPass mRenderPass = VK_NULL_HANDLE;
     VkPipelineLayout mPipelineLayout = VK_NULL_HANDLE;
     VkPipeline mPipeline = VK_NULL_HANDLE;
 
+    // Descriptor related members
     std::vector<Texture> mTextures;
     VkDescriptorSetLayout mDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorPool mDescriptorPool = VK_NULL_HANDLE;
     VkDescriptorSet mDescriptorSet = VK_NULL_HANDLE;
 
+    // Vertex buffer related members
     VkBuffer mVertexBuffer = VK_NULL_HANDLE;
-    VkDeviceMemory mDeviceMemory = VK_NULL_HANDLE;
+    VkDeviceMemory mVertexMemory = VK_NULL_HANDLE;
+
+    // Command buffer related members
     VkCommandPool mCommandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> mCommandBuffers;
 
+    // Semaphores for synchronization
     VkSemaphore mFreeAcquireSemaphore = VK_NULL_HANDLE;
     VkSemaphore mFreeRenderSemaphore = VK_NULL_HANDLE;
     std::vector<VkSemaphore> mAcquireSemaphores;
@@ -108,12 +119,10 @@ private:
     };
     static constexpr const char* kVertexShaderFile = "texture.vert.spv";
     static constexpr const char* kFragmentShaderFile = "texture.frag.spv";
-    // clang-format off
     static constexpr const float vertexData[20] = {
             -1.0F, -1.0F, 0.0F, 0.0F, 0.0F, // LT
             -1.0F,  1.0F, 0.0F, 0.0F, 1.0F, // LB
             1.0F, -1.0F, 0.0F, 1.0F, 0.0F, // RT
             1.0F,  1.0F, 0.0F, 1.0F, 1.0F, // RB
     };
-    // clang-format on
 };

@@ -6,7 +6,7 @@
 
 #include "Utils.h"
 
-/* public APIs start here */
+/* Public APIs start here */
 void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     ASSERT(assetManager);
     mAssetManager = assetManager;
@@ -116,8 +116,8 @@ void Renderer::destroy() {
 
         mVk.DestroyBuffer(mDevice, mVertexBuffer, nullptr);
         mVertexBuffer = VK_NULL_HANDLE;
-        mVk.FreeMemory(mDevice, mDeviceMemory, nullptr);
-        mDeviceMemory = VK_NULL_HANDLE;
+        mVk.FreeMemory(mDevice, mVertexMemory, nullptr);
+        mVertexMemory = VK_NULL_HANDLE;
 
         mVk.DestroyPipeline(mDevice, mPipeline, nullptr);
         mPipeline = VK_NULL_HANDLE;
@@ -154,7 +154,7 @@ void Renderer::destroy() {
     }
 }
 
-/* private APIs start here */
+/* Private APIs start here */
 static bool hasExtension(const char* extension_name,
                          const std::vector<VkExtensionProperties>& extensions) {
     return std::find_if(extensions.cbegin(), extensions.cend(),
@@ -500,7 +500,7 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
                                   reinterpret_cast<int*>(&channel), 4 /*desired_channels*/);
     ASSERT(channel == 4);
 
-    // create a stageImage and stageMemory for the original texture uploading
+    // Create a stageImage and stageMemory for the original texture uploading
     VkImage stageImage = VK_NULL_HANDLE;
     VkDeviceMemory stageMemory = VK_NULL_HANDLE;
     VkImageCreateInfo imageCreateInfo = {
@@ -613,7 +613,7 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
                    VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-    // transitions image out of UNDEFINED type
+    // Transitions image out of UNDEFINED type
     setImageLayout(commandBuffer, outTexture->image, VK_IMAGE_LAYOUT_UNDEFINED,
                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
                    VK_PIPELINE_STAGE_TRANSFER_BIT);
@@ -674,7 +674,7 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
     mVk.DestroyImage(mDevice, stageImage, nullptr);
     mVk.FreeMemory(mDevice, stageMemory, nullptr);
 
-    // record the image's original dimensions so we can respect it later
+    // Record the image's original dimensions so we can respect it later
     outTexture->width = imageWidth;
     outTexture->height = imageHeight;
 
@@ -1074,15 +1074,15 @@ void Renderer::createVertexBuffer() {
             .allocationSize = memoryRequirements.size,
             .memoryTypeIndex = typeIndex,
     };
-    ASSERT(mVk.AllocateMemory(mDevice, &memoryAllocateInfo, nullptr, &mDeviceMemory) == VK_SUCCESS);
+    ASSERT(mVk.AllocateMemory(mDevice, &memoryAllocateInfo, nullptr, &mVertexMemory) == VK_SUCCESS);
 
     void* data;
-    ASSERT(mVk.MapMemory(mDevice, mDeviceMemory, 0, sizeof(vertexData), 0, &data) == VK_SUCCESS);
+    ASSERT(mVk.MapMemory(mDevice, mVertexMemory, 0, sizeof(vertexData), 0, &data) == VK_SUCCESS);
 
     memcpy(data, vertexData, sizeof(vertexData));
-    mVk.UnmapMemory(mDevice, mDeviceMemory);
+    mVk.UnmapMemory(mDevice, mVertexMemory);
 
-    ASSERT(mVk.BindBufferMemory(mDevice, mVertexBuffer, mDeviceMemory, 0) == VK_SUCCESS);
+    ASSERT(mVk.BindBufferMemory(mDevice, mVertexBuffer, mVertexMemory, 0) == VK_SUCCESS);
 
     ALOGD("Successfully created vertex buffer");
 }
