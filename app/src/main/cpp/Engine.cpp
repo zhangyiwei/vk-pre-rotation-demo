@@ -9,7 +9,7 @@ bool Engine::isAnimating() {
 
 void Engine::drawFrame() {
     std::lock_guard<std::mutex> lock(mLock);
-    if (!mIsAnimating) {
+    if (!mIsAnimating || !mIsRendererReady) {
         return;
     }
 
@@ -24,6 +24,7 @@ void Engine::onInitWindow(ANativeWindow* window, AAssetManager* assetManager) {
     std::lock_guard<std::mutex> lock(mLock);
     ALOGD("%s", __FUNCTION__);
     mRenderer.initialize(window, assetManager);
+    mIsRendererReady = true;
 }
 
 void Engine::onLostFocus() {
@@ -43,6 +44,7 @@ void Engine::onTermWindow() {
     ALOGD("%s", __FUNCTION__);
     mIsAnimating = false;
     mRenderer.destroy();
+    mIsRendererReady = false;
 }
 
 void Engine::onSaveState(void** outSavedState, size_t* outSize) {

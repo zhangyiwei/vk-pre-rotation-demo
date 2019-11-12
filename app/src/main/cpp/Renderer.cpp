@@ -21,16 +21,9 @@ void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     createVertexBuffer();
     createCommandBuffers();
     createSemaphores();
-
-    mIsReady.store(true);
 }
 
 void Renderer::drawFrame() {
-    if (!mIsReady.load()) {
-        ALOGD("Vulkan is not ready yet");
-        return;
-    }
-
     VkSemaphore currentAcquireSemaphore = mFreeAcquireSemaphore;
     VkSemaphore currentRenderSemaphore = mFreeRenderSemaphore;
 

@@ -17,7 +17,7 @@ private:
     };
 
 public:
-    explicit Engine() : mIsAnimating(false) {}
+    explicit Engine() : mIsAnimating(false), mIsRendererReady(false) {}
     bool isAnimating();
     void drawFrame();
     void onInitWindow(ANativeWindow* window, AAssetManager* assetManager);
@@ -34,6 +34,7 @@ private:
     State mState;
     Renderer mRenderer;
     bool mIsAnimating;
+    bool mIsRendererReady;
 
     // Engine constants
     static constexpr const uint64_t kLogInterval = 100;

@@ -26,7 +26,7 @@ private:
     };
 
 public:
-    explicit Renderer() { mIsReady.store(false); }
+    explicit Renderer() {}
     void initialize(ANativeWindow* window, AAssetManager* assetManager);
     void drawFrame();
     void destroy();
@@ -55,8 +55,6 @@ private:
 
     // Helper member for Vulkan entry points
     VkHelper mVk;
-    // Protects the order of initialize(...) and drawFrame()
-    std::atomic<bool> mIsReady;
     // A pointer to cache AAssetManager
     AAssetManager* mAssetManager = nullptr;
 
