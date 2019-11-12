@@ -13,7 +13,7 @@ void Engine::drawFrame() {
         return;
     }
 
-    mVkHelper.drawFrame();
+    mRenderer.drawFrame();
 
     if (++mState.frameCount % kLogInterval == 0) {
         ALOGD("%s[%" PRIu64 "]", __FUNCTION__, mState.frameCount);
@@ -23,7 +23,7 @@ void Engine::drawFrame() {
 void Engine::onInitWindow(ANativeWindow* window, AAssetManager* assetManager) {
     std::lock_guard<std::mutex> lock(mLock);
     ALOGD("%s", __FUNCTION__);
-    mVkHelper.initialize(window, assetManager);
+    mRenderer.initialize(window, assetManager);
 }
 
 void Engine::onLostFocus() {
@@ -42,7 +42,7 @@ void Engine::onTermWindow() {
     std::lock_guard<std::mutex> lock(mLock);
     ALOGD("%s", __FUNCTION__);
     mIsAnimating = false;
-    mVkHelper.destroy();
+    mRenderer.destroy();
 }
 
 void Engine::onSaveState(void** outSavedState, size_t* outSize) {

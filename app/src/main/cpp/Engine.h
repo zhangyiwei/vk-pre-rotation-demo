@@ -4,7 +4,7 @@
 
 #include <mutex>
 
-#include "VkHelper.h"
+#include "Renderer.h"
 
 class Engine {
 private:
@@ -32,7 +32,7 @@ private:
     // mLock protects all members below
     std::mutex mLock;
     State mState;
-    VkHelper mVkHelper;
+    Renderer mRenderer;
     bool mIsAnimating;
 
     // Engine constants

@@ -4,6 +4,7 @@ add_library(vkdemo
             SHARED
             src/main/cpp/main.cpp
             src/main/cpp/Engine.cpp
+            src/main/cpp/Renderer.cpp
             src/main/cpp/VkHelper.cpp)
 
 add_library(native_app_glue
