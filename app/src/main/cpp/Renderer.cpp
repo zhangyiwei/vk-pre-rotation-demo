@@ -491,6 +491,9 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
                                   reinterpret_cast<int*>(&imageWidth),
                                   reinterpret_cast<int*>(&imageHeight),
                                   reinterpret_cast<int*>(&channel), 4 /*desired_channels*/);
+    ASSERT(imageData);
+    ASSERT(imageWidth);
+    ASSERT(imageHeight);
     ASSERT(channel == 4);
 
     // Create a stageImage and stageMemory for the original texture uploading
@@ -1043,6 +1046,19 @@ void Renderer::createGraphicsPipeline() {
 }
 
 void Renderer::createVertexBuffer() {
+    // Calculate the vertex data for the only texture in this demo
+    const float scaleW = mWidth / (float)mTextures[0].width;
+    const float scaleH = mHeight / (float)mTextures[0].height;
+    const float scale = scaleW < scaleH ? scaleW : scaleH;
+    const float xPos = scale / scaleW;
+    const float yPos = scale / scaleH;
+    const float vertexData[20] = {
+            -xPos, -yPos, 0.0F, 0.0F, 0.0F, // LT
+            -xPos, yPos,  0.0F, 0.0F, 1.0F, // LB
+            xPos,  -yPos, 0.0F, 1.0F, 0.0F, // RT
+            xPos,  yPos,  0.0F, 1.0F, 1.0F, // RB
+    };
+
     const uint32_t queueFamilyIndex = mQueueFamilyIndex;
     const VkBufferCreateInfo bufferCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,

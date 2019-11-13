@@ -117,10 +117,4 @@ private:
     };
     static constexpr const char* kVertexShaderFile = "texture.vert.spv";
     static constexpr const char* kFragmentShaderFile = "texture.frag.spv";
-    static constexpr const float vertexData[20] = {
-            -1.0F, -1.0F, 0.0F, 0.0F, 0.0F, // LT
-            -1.0F,  1.0F, 0.0F, 0.0F, 1.0F, // LB
-            1.0F, -1.0F, 0.0F, 1.0F, 0.0F, // RT
-            1.0F,  1.0F, 0.0F, 1.0F, 1.0F, // RB
-    };
 };
