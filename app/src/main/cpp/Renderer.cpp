@@ -323,15 +323,13 @@ void Renderer::createSwapchain(ANativeWindow* window) {
 
     mWidth = surfaceCapabilities.currentExtent.width;
     mHeight = surfaceCapabilities.currentExtent.height;
-    mPreTransform = surfaceCapabilities.currentTransform;
+    mPreTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR; // surfaceCapabilities.currentTransform;
 
-    if ((mPreTransform &
-         (VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR |
-          VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_90_BIT_KHR |
-          VK_SURFACE_TRANSFORM_HORIZONTAL_MIRROR_ROTATE_270_BIT_KHR)) != 0) {
-        mWidth = mWidth ^ mHeight;
-        mHeight = mHeight ^ mWidth;
-        mWidth = mWidth ^ mHeight;
+    if (mPreTransform &
+        (VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR)) {
+        mWidth ^= mHeight;
+        mHeight ^= mWidth;
+        mWidth ^= mHeight;
     }
 
     const VkSwapchainCreateInfoKHR swapchainCreateInfo = {
@@ -352,7 +350,7 @@ void Renderer::createSwapchain(ANativeWindow* window) {
             .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
             .queueFamilyIndexCount = 1,
             .pQueueFamilyIndices = &mQueueFamilyIndex,
-            .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+            .preTransform = mPreTransform,
             .compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
             .presentMode = VK_PRESENT_MODE_FIFO_KHR,
             .clipped = VK_FALSE,
