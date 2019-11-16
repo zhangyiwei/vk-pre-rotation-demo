@@ -95,6 +95,8 @@ void android_main(android_app* app) {
     app->onInputEvent = handleInputEvent;
     app->activity->callbacks->onNativeWindowResized = handleNativeWindowResized;
 
+    ALOGD("Platform sdkVersion = %d", app->activity->sdkVersion);
+
     while (true) {
         int events;
         android_poll_source* source;

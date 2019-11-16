@@ -9,15 +9,16 @@
 class Engine {
 private:
     struct State {
+        uint64_t frameCount;
         int32_t inputX;
         int32_t inputY;
-        uint64_t frameCount;
+        bool isAnimating;
 
-        State() : inputX(0), inputY(0), frameCount(0) {}
+        State() : frameCount(0), inputX(0), inputY(0), isAnimating(false) {}
     };
 
 public:
-    explicit Engine() : mIsAnimating(false), mIsRendererReady(false) {}
+    explicit Engine() : mIsRendererReady(false) {}
     bool isAnimating();
     void drawFrame();
     void onInitWindow(ANativeWindow* window, AAssetManager* assetManager);
@@ -33,7 +34,6 @@ private:
     std::mutex mLock;
     State mState;
     Renderer mRenderer;
-    bool mIsAnimating;
     bool mIsRendererReady;
 
     // Engine constants

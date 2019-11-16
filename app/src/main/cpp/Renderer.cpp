@@ -1203,9 +1203,9 @@ void Renderer::recordCommandBuffer(uint32_t index) {
     ASSERT(mVk.BeginCommandBuffer(mCommandBuffers[index], &commandBufferBeginInfo) == VK_SUCCESS);
 
     const VkClearValue clearVals = {
-            .color.float32[0] = 0.0F,
-            .color.float32[1] = 0.0F,
-            .color.float32[2] = 0.0F,
+            .color.float32[0] = 0.5F,
+            .color.float32[1] = 0.5F,
+            .color.float32[2] = 0.5F,
             .color.float32[3] = 1.0F,
     };
     const VkRenderPassBeginInfo renderPassBeginInfo = {
