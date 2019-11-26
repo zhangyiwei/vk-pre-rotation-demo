@@ -13,7 +13,8 @@ void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
 
     createInstance();
     createDevice();
-    createSwapchain(window);
+    createSurface(window);
+    createSwapchain();
     createTextures();
     createDescriptorSet();
     createRenderPass();
@@ -271,7 +272,7 @@ void Renderer::createDevice() {
     ALOGD("Successfully created device");
 }
 
-void Renderer::createSwapchain(ANativeWindow* window) {
+void Renderer::createSurface(ANativeWindow* window) {
     ASSERT(window);
 
     const VkAndroidSurfaceCreateInfoKHR surfaceInfo = {
@@ -302,7 +303,12 @@ void Renderer::createSwapchain(ANativeWindow* window) {
     }
     ASSERT(formatIndex < formatCount);
     mFormat = formats[formatIndex].format;
+    mColorSpace = formats[formatIndex].colorSpace;
 
+    ALOGD("Successfully created surface");
+}
+
+void Renderer::createSwapchain() {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     ASSERT(mVk.GetPhysicalDeviceSurfaceCapabilitiesKHR(mGpu, mSurface, &surfaceCapabilities) ==
            VK_SUCCESS);
@@ -339,7 +345,7 @@ void Renderer::createSwapchain(ANativeWindow* window) {
             .surface = mSurface,
             .minImageCount = kReqImageCount,
             .imageFormat = mFormat,
-            .imageColorSpace = formats[formatIndex].colorSpace,
+            .imageColorSpace = mColorSpace,
             .imageExtent =
                     {
                             .width = mWidth,

@@ -34,7 +34,8 @@ public:
 private:
     void createInstance();
     void createDevice();
-    void createSwapchain(ANativeWindow* window);
+    void createSurface(ANativeWindow* window);
+    void createSwapchain();
     uint32_t getMemoryTypeIndex(uint32_t typeBits, VkFlags mask);
     void setImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldImageLayout,
                         VkImageLayout newImageLayout, VkPipelineStageFlags srcStages,
@@ -68,6 +69,7 @@ private:
     // Swapchain related members
     VkSurfaceKHR mSurface = VK_NULL_HANDLE;
     VkFormat mFormat = VK_FORMAT_UNDEFINED;
+    VkColorSpaceKHR mColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     uint32_t mWidth = 0;
     uint32_t mHeight = 0;
     VkSurfaceTransformFlagBitsKHR mPreTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;

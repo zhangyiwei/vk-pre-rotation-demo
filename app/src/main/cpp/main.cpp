@@ -5,7 +5,6 @@
 #include "Utils.h"
 
 static void handleAppCmd(android_app* app, int32_t cmd) {
-    ALOGD("%s", __FUNCTION__);
     auto engine = static_cast<Engine*>(app->userData);
     switch (cmd) {
         case APP_CMD_INPUT_CHANGED:
