@@ -6,6 +6,8 @@
 
 #include "Utils.h"
 
+#define TIMEOUT_30_SEC 30000000000
+
 /* Public APIs start here */
 void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     ASSERT(assetManager);
@@ -22,6 +24,7 @@ void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     createVertexBuffer();
     createCommandBuffers();
     createSemaphores();
+    createFences();
 }
 
 void Renderer::drawFrame() {
@@ -50,7 +53,8 @@ void Renderer::drawFrame() {
             .signalSemaphoreCount = 1,
             .pSignalSemaphores = &currentRenderSemaphore,
     };
-    ASSERT(mVk.QueueSubmit(mQueue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS);
+    ASSERT(mVk.QueueSubmit(mQueue, 1, &submitInfo, mInflightFences[mFrameCount % kInflight]) ==
+           VK_SUCCESS);
 
     const VkPresentInfoKHR presentInfo = {
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -71,7 +75,13 @@ void Renderer::drawFrame() {
     mFreeRenderSemaphore = mRenderSemaphores[index];
     mRenderSemaphores[index] = currentRenderSemaphore;
 
-    // ALOGD("Successfully draw a frame[SUBOPTIMAL(%u)]", ret == VK_SUBOPTIMAL_KHR);
+    // Wait on the (N - (kInflight - 1))th fence to signal after presenting the Nth frame
+    ASSERT(mVk.WaitForFences(mDevice, 1, &mInflightFences[++mFrameCount % kInflight], VK_TRUE,
+                             TIMEOUT_30_SEC) == VK_SUCCESS);
+
+    if (mFrameCount % kLogInterval == 0) {
+        ALOGD("%s[%u][%d]", __FUNCTION__, mFrameCount, ret);
+    }
 }
 
 void Renderer::destroy() {
@@ -88,17 +98,24 @@ void Renderer::destroy() {
         }
         mFramebuffers.clear();
 
+        for (auto& fence : mInflightFences) {
+            mVk.DestroyFence(mDevice, fence, nullptr);
+        }
+        mInflightFences.clear();
+
         mVk.DestroySemaphore(mDevice, mFreeAcquireSemaphore, nullptr);
         mFreeAcquireSemaphore = VK_NULL_HANDLE;
         for (auto& semaphore : mAcquireSemaphores) {
             mVk.DestroySemaphore(mDevice, semaphore, nullptr);
         }
+        mAcquireSemaphores.clear();
 
         mVk.DestroySemaphore(mDevice, mFreeRenderSemaphore, nullptr);
         mFreeRenderSemaphore = VK_NULL_HANDLE;
         for (auto& semaphore : mRenderSemaphores) {
             mVk.DestroySemaphore(mDevice, semaphore, nullptr);
         }
+        mRenderSemaphores.clear();
 
         if (!mCommandBuffers.empty()) {
             mVk.FreeCommandBuffers(mDevice, mCommandPool, mCommandBuffers.size(),
@@ -618,7 +635,7 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
                    VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-    VkImageCopy blitInfo = {
+    const VkImageCopy blitInfo = {
             .srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             .srcSubresource.mipLevel = 0,
             .srcSubresource.baseArrayLayer = 0,
@@ -646,15 +663,15 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
 
     ASSERT(mVk.EndCommandBuffer(commandBuffer) == VK_SUCCESS);
 
-    VkFenceCreateInfo fenceInfo = {
+    const VkFenceCreateInfo fenceCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
             .pNext = nullptr,
             .flags = 0,
     };
     VkFence fence;
-    ASSERT(mVk.CreateFence(mDevice, &fenceInfo, nullptr, &fence) == VK_SUCCESS);
+    ASSERT(mVk.CreateFence(mDevice, &fenceCreateInfo, nullptr, &fence) == VK_SUCCESS);
 
-    VkSubmitInfo submitInfo = {
+    const VkSubmitInfo submitInfo = {
             .pNext = nullptr,
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .waitSemaphoreCount = 0,
@@ -666,7 +683,7 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
             .pSignalSemaphores = nullptr,
     };
     ASSERT(mVk.QueueSubmit(mQueue, 1, &submitInfo, fence) == VK_SUCCESS);
-    ASSERT(mVk.WaitForFences(mDevice, 1, &fence, VK_TRUE, 100000000) == VK_SUCCESS);
+    ASSERT(mVk.WaitForFences(mDevice, 1, &fence, VK_TRUE, TIMEOUT_30_SEC) == VK_SUCCESS);
     mVk.DestroyFence(mDevice, fence, nullptr);
 
     mVk.FreeCommandBuffers(mDevice, commandPool, 1, &commandBuffer);
@@ -1136,7 +1153,7 @@ void Renderer::createSemaphore(VkSemaphore* outSemaphore) {
 void Renderer::createSemaphores() {
     mAcquireSemaphores.resize(mImageCount, VK_NULL_HANDLE);
     mRenderSemaphores.resize(mImageCount, VK_NULL_HANDLE);
-    for (int i = 0; i < mImageCount; ++i) {
+    for (int i = 0; i < mImageCount; i++) {
         createSemaphore(&mAcquireSemaphores[i]);
         createSemaphore(&mRenderSemaphores[i]);
     }
@@ -1145,6 +1162,21 @@ void Renderer::createSemaphores() {
     createSemaphore(&mFreeRenderSemaphore);
 
     ALOGD("Successfully created semaphores");
+}
+
+void Renderer::createFences() {
+    mInflightFences.resize(kInflight, VK_NULL_HANDLE);
+    const VkFenceCreateInfo fenceCreateInfo = {
+            .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+    };
+    for (int i = 0; i < kInflight; i++) {
+        ASSERT(mVk.CreateFence(mDevice, &fenceCreateInfo, nullptr, &mInflightFences[i]) ==
+               VK_SUCCESS);
+    }
+
+    ALOGD("Successfully created fences");
 }
 
 void Renderer::createImageView(uint32_t index) {

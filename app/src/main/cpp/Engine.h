@@ -9,12 +9,11 @@
 class Engine {
 private:
     struct State {
-        uint64_t frameCount;
         int32_t inputX;
         int32_t inputY;
         bool isAnimating;
 
-        State() : frameCount(0), inputX(0), inputY(0), isAnimating(false) {}
+        State() : inputX(0), inputY(0), isAnimating(false) {}
     };
 
 public:
@@ -35,7 +34,4 @@ private:
     State mState;
     Renderer mRenderer;
     bool mIsRendererReady;
-
-    // Engine constants
-    static constexpr const uint64_t kLogInterval = 100;
 };

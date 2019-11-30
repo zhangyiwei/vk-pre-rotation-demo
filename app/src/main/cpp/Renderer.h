@@ -50,6 +50,7 @@ private:
     void createCommandBuffers();
     void createSemaphore(VkSemaphore* outSemaphore);
     void createSemaphores();
+    void createFences();
     void createImageView(uint32_t index);
     void createFramebuffer(uint32_t index);
     void recordCommandBuffer(uint32_t index);
@@ -75,6 +76,7 @@ private:
     VkSurfaceTransformFlagBitsKHR mPreTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
     uint32_t mImageCount = 0;
+    uint32_t mFrameCount = 0;
     std::vector<VkImage> mImages;
     std::vector<VkImageView> mImageViews;
     std::vector<VkFramebuffer> mFramebuffers;
@@ -104,6 +106,9 @@ private:
     std::vector<VkSemaphore> mAcquireSemaphores;
     std::vector<VkSemaphore> mRenderSemaphores;
 
+    // Fences for latency control
+    std::vector<VkFence> mInflightFences;
+
     // App specific constants
     static constexpr const char* kRequiredInstanceExtensions[2] = {
             "VK_KHR_surface",
@@ -113,10 +118,12 @@ private:
             "VK_KHR_swapchain",
     };
     static constexpr const uint32_t kReqImageCount = 3;
+    static constexpr const uint32_t kInflight = 2;
     static constexpr const uint32_t kTextureCount = 1;
     static constexpr const char* kTextureFiles[kTextureCount] = {
             "sample_tex.png",
     };
     static constexpr const char* kVertexShaderFile = "texture.vert.spv";
     static constexpr const char* kFragmentShaderFile = "texture.frag.spv";
+    static constexpr const uint32_t kLogInterval = 100;
 };

@@ -12,12 +12,7 @@ void Engine::drawFrame() {
     if (!mState.isAnimating || !mIsRendererReady) {
         return;
     }
-
     mRenderer.drawFrame();
-
-    if (++mState.frameCount % kLogInterval == 0) {
-        ALOGD("%s[%" PRIu64 "]", __FUNCTION__, mState.frameCount);
-    }
 }
 
 void Engine::onInitWindow(ANativeWindow* window, AAssetManager* assetManager) {
