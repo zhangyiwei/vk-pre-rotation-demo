@@ -123,4 +123,5 @@ private:
     static constexpr const char* kVertexShaderFile = "texture.vert.spv";
     static constexpr const char* kFragmentShaderFile = "texture.frag.spv";
     static constexpr const uint32_t kLogInterval = 100;
+    static constexpr const uint64_t kTimeout30Sec = 30000000000;
 };

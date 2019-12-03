@@ -6,8 +6,6 @@
 
 #include "Utils.h"
 
-#define TIMEOUT_30_SEC 30000000000
-
 /* Public APIs start here */
 void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     ASSERT(assetManager);
@@ -28,8 +26,8 @@ void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
 }
 
 void Renderer::drawFrame() {
-    uint32_t frameIndex = mFrameCount % kInflight;
-    ASSERT(mVk.WaitForFences(mDevice, 1, &mInflightFences[frameIndex], VK_TRUE, TIMEOUT_30_SEC) ==
+    const uint32_t frameIndex = mFrameCount % kInflight;
+    ASSERT(mVk.WaitForFences(mDevice, 1, &mInflightFences[frameIndex], VK_TRUE, kTimeout30Sec) ==
            VK_SUCCESS);
 
     ASSERT(mVk.ResetFences(mDevice, 1, &mInflightFences[frameIndex]) == VK_SUCCESS);
@@ -44,7 +42,7 @@ void Renderer::drawFrame() {
 
     recordCommandBuffer(frameIndex, imageIndex);
 
-    VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    const VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     const VkSubmitInfo submitInfo = {
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .pNext = nullptr,
@@ -672,7 +670,7 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
             .pSignalSemaphores = nullptr,
     };
     ASSERT(mVk.QueueSubmit(mQueue, 1, &submitInfo, fence) == VK_SUCCESS);
-    ASSERT(mVk.WaitForFences(mDevice, 1, &fence, VK_TRUE, TIMEOUT_30_SEC) == VK_SUCCESS);
+    ASSERT(mVk.WaitForFences(mDevice, 1, &fence, VK_TRUE, kTimeout30Sec) == VK_SUCCESS);
     mVk.DestroyFence(mDevice, fence, nullptr);
 
     mVk.FreeCommandBuffers(mDevice, commandPool, 1, &commandBuffer);
@@ -941,7 +939,7 @@ void Renderer::createGraphicsPipeline() {
             .scissorCount = 1,
             .pScissors = &scissor,
     };
-    VkSampleMask sampleMask = ~0U;
+    const VkSampleMask sampleMask = ~0U;
     const VkPipelineMultisampleStateCreateInfo multisampleInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
             .pNext = nullptr,
