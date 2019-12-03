@@ -14,7 +14,7 @@ void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     createInstance();
     createDevice();
     createSurface(window);
-    createSwapchain();
+    createSwapchain(VK_NULL_HANDLE);
     createTextures();
     createDescriptorSet();
     createRenderPass();
@@ -67,7 +67,28 @@ void Renderer::drawFrame() {
             .pResults = nullptr,
     };
     VkResult ret = mVk.QueuePresentKHR(mQueue, &presentInfo);
-    ASSERT(ret == VK_SUCCESS || ret == VK_SUBOPTIMAL_KHR);
+
+    if (mOldSwapchain != VK_NULL_HANDLE && mRetireFrame == mFrameCount) {
+        destroyOldSwapchain();
+    }
+
+    // VK_SUBOPTIMAL_KHR shouldn't occur again within kInflight frames. If it happens, will switch
+    // to an array later to save the obsolete swapchain stuff
+    if (ret == VK_SUBOPTIMAL_KHR) {
+        mOldSwapchain = mSwapchain;
+        mSwapchain = VK_NULL_HANDLE;
+        std::swap(mImages, mOldImages);
+        std::swap(mImageViews, mOldImageViews);
+        std::swap(mFramebuffers, mOldFramebuffers);
+
+        mRetireFrame = mFrameCount + kInflight;
+
+        // Recreate the new swapchain with the latest preTransform
+        createSwapchain(mOldSwapchain);
+        ALOGD("%s[%u][%d] - recreated swapchain", __FUNCTION__, mFrameCount, ret);
+    } else {
+        ASSERT(ret == VK_SUCCESS);
+    }
 
     if (++mFrameCount % kLogInterval == 0) {
         ALOGD("%s[%u][%d]", __FUNCTION__, mFrameCount, ret);
@@ -77,16 +98,6 @@ void Renderer::drawFrame() {
 void Renderer::destroy() {
     if (mDevice != VK_NULL_HANDLE) {
         mVk.DeviceWaitIdle(mDevice);
-
-        for (auto& imageView : mImageViews) {
-            mVk.DestroyImageView(mDevice, imageView, nullptr);
-        }
-        mImageViews.clear();
-
-        for (auto& framebuffer : mFramebuffers) {
-            mVk.DestroyFramebuffer(mDevice, framebuffer, nullptr);
-        }
-        mFramebuffers.clear();
 
         for (auto& fence : mInflightFences) {
             mVk.DestroyFence(mDevice, fence, nullptr);
@@ -136,6 +147,20 @@ void Renderer::destroy() {
         }
         mTextures.clear();
 
+        destroyOldSwapchain();
+
+        for (auto& imageView : mImageViews) {
+            mVk.DestroyImageView(mDevice, imageView, nullptr);
+        }
+        mImageViews.clear();
+
+        for (auto& framebuffer : mFramebuffers) {
+            mVk.DestroyFramebuffer(mDevice, framebuffer, nullptr);
+        }
+        mFramebuffers.clear();
+
+        mImages.clear();
+
         mVk.DestroySwapchainKHR(mDevice, mSwapchain, nullptr);
 
         mVk.DestroyDevice(mDevice, nullptr);
@@ -149,6 +174,8 @@ void Renderer::destroy() {
         mVk.DestroyInstance(mInstance, nullptr);
         mInstance = VK_NULL_HANDLE;
     }
+
+    ALOGD("Successfully destroyed Vulkan renderer");
 }
 
 /* Private APIs start here */
@@ -311,28 +338,17 @@ void Renderer::createSurface(ANativeWindow* window) {
     ALOGD("Successfully created surface");
 }
 
-void Renderer::createSwapchain() {
+void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     ASSERT(mVk.GetPhysicalDeviceSurfaceCapabilitiesKHR(mGpu, mSurface, &surfaceCapabilities) ==
            VK_SUCCESS);
-
-    ALOGD("Vulkan Surface Capabilities:\n");
-    ALOGD("\timage count: %u - %u\n", surfaceCapabilities.minImageCount,
-          surfaceCapabilities.maxImageCount);
-    ALOGD("\tarray layers: %u\n", surfaceCapabilities.maxImageArrayLayers);
-    ALOGD("\timage size (now): %dx%d\n", surfaceCapabilities.currentExtent.width,
+    ALOGD("Current image size: %dx%d\n", surfaceCapabilities.currentExtent.width,
           surfaceCapabilities.currentExtent.height);
-    ALOGD("\timage size (extent): %dx%d - %dx%d\n", surfaceCapabilities.minImageExtent.width,
-          surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.width,
-          surfaceCapabilities.maxImageExtent.height);
-    ALOGD("\tusage: %x\n", surfaceCapabilities.supportedUsageFlags);
-    ALOGD("\tcurrent transform: %u\n", surfaceCapabilities.currentTransform);
-    ALOGD("\tallowed transforms: %x\n", surfaceCapabilities.supportedTransforms);
-    ALOGD("\tcomposite alpha flags: %u\n", surfaceCapabilities.supportedCompositeAlpha);
+    ALOGD("Current transform: 0x%x\n", surfaceCapabilities.currentTransform);
 
     mWidth = surfaceCapabilities.currentExtent.width;
     mHeight = surfaceCapabilities.currentExtent.height;
-    mPreTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR; // surfaceCapabilities.currentTransform;
+    mPreTransform = surfaceCapabilities.currentTransform;
 
     if (mPreTransform &
         (VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR)) {
@@ -363,7 +379,7 @@ void Renderer::createSwapchain() {
             .compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
             .presentMode = VK_PRESENT_MODE_FIFO_KHR,
             .clipped = VK_FALSE,
-            .oldSwapchain = VK_NULL_HANDLE,
+            .oldSwapchain = oldSwapchain,
     };
     ASSERT(mVk.CreateSwapchainKHR(mDevice, &swapchainCreateInfo, nullptr, &mSwapchain) ==
            VK_SUCCESS);
@@ -713,7 +729,7 @@ void Renderer::createTextures() {
         ASSERT(mVk.CreateSampler(mDevice, &samplerCreateInfo, nullptr, &mTextures[i].sampler) ==
                VK_SUCCESS);
 
-        VkImageViewCreateInfo viewCreateInfo = {
+        const VkImageViewCreateInfo viewCreateInfo = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .pNext = nullptr,
                 .flags = 0,
@@ -1163,7 +1179,7 @@ void Renderer::createFences() {
     ALOGD("Successfully created fences");
 }
 
-void Renderer::createImageView(uint32_t index) {
+void Renderer::createFramebuffer(uint32_t index) {
     const VkImageViewCreateInfo imageViewCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .pNext = nullptr,
@@ -1189,14 +1205,6 @@ void Renderer::createImageView(uint32_t index) {
     };
     ASSERT(mVk.CreateImageView(mDevice, &imageViewCreateInfo, nullptr, &mImageViews[index]) ==
            VK_SUCCESS);
-
-    ALOGD("Successfully created imageView[%u]", index);
-}
-
-void Renderer::createFramebuffer(uint32_t index) {
-    if (mImageViews[index] == VK_NULL_HANDLE) {
-        createImageView(index);
-    }
 
     const VkFramebufferCreateInfo framebufferCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -1268,4 +1276,23 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     mVk.CmdEndRenderPass(mCommandBuffers[frameIndex]);
 
     ASSERT(mVk.EndCommandBuffer(mCommandBuffers[frameIndex]) == VK_SUCCESS);
+}
+
+void Renderer::destroyOldSwapchain() {
+    for (auto& framebuffer : mOldFramebuffers) {
+        mVk.DestroyFramebuffer(mDevice, framebuffer, nullptr);
+    }
+    mOldFramebuffers.clear();
+
+    for (auto& imageView : mOldImageViews) {
+        mVk.DestroyImageView(mDevice, imageView, nullptr);
+    }
+    mOldImageViews.clear();
+
+    mOldImages.clear();
+
+    mVk.DestroySwapchainKHR(mDevice, mOldSwapchain, nullptr);
+    mOldSwapchain = VK_NULL_HANDLE;
+
+    ALOGD("Successfully destroyed old swapchain");
 }

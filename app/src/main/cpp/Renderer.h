@@ -35,7 +35,7 @@ private:
     void createInstance();
     void createDevice();
     void createSurface(ANativeWindow* window);
-    void createSwapchain();
+    void createSwapchain(VkSwapchainKHR oldSwapchain);
     uint32_t getMemoryTypeIndex(uint32_t typeBits, VkFlags mask);
     void setImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldImageLayout,
                         VkImageLayout newImageLayout, VkPipelineStageFlags srcStages,
@@ -51,9 +51,9 @@ private:
     void createSemaphore(VkSemaphore* outSemaphore);
     void createSemaphores();
     void createFences();
-    void createImageView(uint32_t index);
     void createFramebuffer(uint32_t index);
     void recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex);
+    void destroyOldSwapchain();
 
     // Helper member for Vulkan entry points
     VkHelper mVk;
@@ -74,11 +74,17 @@ private:
     uint32_t mWidth = 0;
     uint32_t mHeight = 0;
     VkSurfaceTransformFlagBitsKHR mPreTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-    VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
     uint32_t mFrameCount = 0;
+    VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
     std::vector<VkImage> mImages;
     std::vector<VkImageView> mImageViews;
     std::vector<VkFramebuffer> mFramebuffers;
+    // For swapchain recreation
+    uint32_t mRetireFrame = 0;
+    VkSwapchainKHR mOldSwapchain = VK_NULL_HANDLE;
+    std::vector<VkImage> mOldImages;
+    std::vector<VkImageView> mOldImageViews;
+    std::vector<VkFramebuffer> mOldFramebuffers;
 
     // Graphics pipeline related members
     VkRenderPass mRenderPass = VK_NULL_HANDLE;
