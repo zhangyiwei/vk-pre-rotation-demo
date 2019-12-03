@@ -28,58 +28,50 @@ void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
 }
 
 void Renderer::drawFrame() {
-    VkSemaphore currentAcquireSemaphore = mFreeAcquireSemaphore;
-    VkSemaphore currentRenderSemaphore = mFreeRenderSemaphore;
+    uint32_t frameIndex = mFrameCount % kInflight;
+    ASSERT(mVk.WaitForFences(mDevice, 1, &mInflightFences[frameIndex], VK_TRUE, TIMEOUT_30_SEC) ==
+           VK_SUCCESS);
 
-    uint32_t index;
-    ASSERT(mVk.AcquireNextImageKHR(mDevice, mSwapchain, UINT64_MAX, currentAcquireSemaphore,
-                                   VK_NULL_HANDLE, &index) == VK_SUCCESS);
+    ASSERT(mVk.ResetFences(mDevice, 1, &mInflightFences[frameIndex]) == VK_SUCCESS);
 
-    if (mFramebuffers[index] == VK_NULL_HANDLE) {
-        createFramebuffer(index);
+    uint32_t imageIndex;
+    ASSERT(mVk.AcquireNextImageKHR(mDevice, mSwapchain, UINT64_MAX, mAcquireSemaphores[frameIndex],
+                                   VK_NULL_HANDLE, &imageIndex) == VK_SUCCESS);
+
+    if (mFramebuffers[imageIndex] == VK_NULL_HANDLE) {
+        createFramebuffer(imageIndex);
     }
 
-    recordCommandBuffer(index);
+    recordCommandBuffer(frameIndex, imageIndex);
 
     VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     const VkSubmitInfo submitInfo = {
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .pNext = nullptr,
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &currentAcquireSemaphore,
+            .pWaitSemaphores = &mAcquireSemaphores[frameIndex],
             .pWaitDstStageMask = &waitStageMask,
             .commandBufferCount = 1,
-            .pCommandBuffers = &mCommandBuffers[index],
+            .pCommandBuffers = &mCommandBuffers[frameIndex],
             .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &currentRenderSemaphore,
+            .pSignalSemaphores = &mRenderSemaphores[frameIndex],
     };
-    ASSERT(mVk.QueueSubmit(mQueue, 1, &submitInfo, mInflightFences[mFrameCount % kInflight]) ==
-           VK_SUCCESS);
+    ASSERT(mVk.QueueSubmit(mQueue, 1, &submitInfo, mInflightFences[frameIndex]) == VK_SUCCESS);
 
     const VkPresentInfoKHR presentInfo = {
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .pNext = nullptr,
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &currentRenderSemaphore,
+            .pWaitSemaphores = &mRenderSemaphores[frameIndex],
             .swapchainCount = 1,
             .pSwapchains = &mSwapchain,
-            .pImageIndices = &index,
+            .pImageIndices = &imageIndex,
             .pResults = nullptr,
     };
     VkResult ret = mVk.QueuePresentKHR(mQueue, &presentInfo);
     ASSERT(ret == VK_SUCCESS || ret == VK_SUBOPTIMAL_KHR);
 
-    mFreeAcquireSemaphore = mAcquireSemaphores[index];
-    mAcquireSemaphores[index] = currentAcquireSemaphore;
-
-    mFreeRenderSemaphore = mRenderSemaphores[index];
-    mRenderSemaphores[index] = currentRenderSemaphore;
-
-    // Wait on the (N - (kInflight - 1))th fence to signal after presenting the Nth frame
-    ASSERT(mVk.WaitForFences(mDevice, 1, &mInflightFences[++mFrameCount % kInflight], VK_TRUE,
-                             TIMEOUT_30_SEC) == VK_SUCCESS);
-
-    if (mFrameCount % kLogInterval == 0) {
+    if (++mFrameCount % kLogInterval == 0) {
         ALOGD("%s[%u][%d]", __FUNCTION__, mFrameCount, ret);
     }
 }
@@ -103,15 +95,11 @@ void Renderer::destroy() {
         }
         mInflightFences.clear();
 
-        mVk.DestroySemaphore(mDevice, mFreeAcquireSemaphore, nullptr);
-        mFreeAcquireSemaphore = VK_NULL_HANDLE;
         for (auto& semaphore : mAcquireSemaphores) {
             mVk.DestroySemaphore(mDevice, semaphore, nullptr);
         }
         mAcquireSemaphores.clear();
 
-        mVk.DestroySemaphore(mDevice, mFreeRenderSemaphore, nullptr);
-        mFreeRenderSemaphore = VK_NULL_HANDLE;
         for (auto& semaphore : mRenderSemaphores) {
             mVk.DestroySemaphore(mDevice, semaphore, nullptr);
         }
@@ -175,7 +163,7 @@ static bool hasExtension(const char* extension_name,
 }
 
 void Renderer::createInstance() {
-    mVk.initializeGlobalApis();
+    mVk.initializeGlobalApi();
 
     uint32_t instanceVersion = 0;
     ASSERT(mVk.EnumerateInstanceVersion(&instanceVersion) == VK_SUCCESS);
@@ -216,7 +204,7 @@ void Renderer::createInstance() {
     };
 
     ASSERT(mVk.CreateInstance(&instanceInfo, nullptr, &mInstance) == VK_SUCCESS);
-    mVk.initializeInstanceApis(mInstance);
+    mVk.initializeInstanceApi(mInstance);
 
     ALOGD("Successfully created instance");
 }
@@ -282,7 +270,7 @@ void Renderer::createDevice() {
             .pEnabledFeatures = nullptr,
     };
     ASSERT(mVk.CreateDevice(mGpu, &deviceCreateInfo, nullptr, &mDevice) == VK_SUCCESS);
-    mVk.initializeDeviceApis(mDevice);
+    mVk.initializeDeviceApi(mDevice);
 
     mVk.GetDeviceQueue(mDevice, mQueueFamilyIndex, 0, &mQueue);
 
@@ -382,15 +370,16 @@ void Renderer::createSwapchain() {
     ASSERT(mVk.CreateSwapchainKHR(mDevice, &swapchainCreateInfo, nullptr, &mSwapchain) ==
            VK_SUCCESS);
 
-    ASSERT(mVk.GetSwapchainImagesKHR(mDevice, mSwapchain, &mImageCount, nullptr) == VK_SUCCESS);
-    ALOGD("Swapchain image count = %u", mImageCount);
+    uint32_t imageCount = 0;
+    ASSERT(mVk.GetSwapchainImagesKHR(mDevice, mSwapchain, &imageCount, nullptr) == VK_SUCCESS);
+    ALOGD("Swapchain image count = %u", imageCount);
 
-    mImages.resize(mImageCount, VK_NULL_HANDLE);
-    ASSERT(mVk.GetSwapchainImagesKHR(mDevice, mSwapchain, &mImageCount, mImages.data()) ==
+    mImages.resize(imageCount, VK_NULL_HANDLE);
+    ASSERT(mVk.GetSwapchainImagesKHR(mDevice, mSwapchain, &imageCount, mImages.data()) ==
            VK_SUCCESS);
 
-    mImageViews.resize(mImageCount, VK_NULL_HANDLE);
-    mFramebuffers.resize(mImageCount, VK_NULL_HANDLE);
+    mImageViews.resize(imageCount, VK_NULL_HANDLE);
+    mFramebuffers.resize(imageCount, VK_NULL_HANDLE);
 
     ALOGD("Successfully created swapchain");
 }
@@ -1127,13 +1116,13 @@ void Renderer::createCommandBuffers() {
     ASSERT(mVk.CreateCommandPool(mDevice, &commandPoolCreateInfo, nullptr, &mCommandPool) ==
            VK_SUCCESS);
 
-    mCommandBuffers.resize(mImageCount, VK_NULL_HANDLE);
+    mCommandBuffers.resize(kInflight, VK_NULL_HANDLE);
     const VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = nullptr,
             .commandPool = mCommandPool,
             .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-            .commandBufferCount = mImageCount,
+            .commandBufferCount = kInflight,
     };
     ASSERT(mVk.AllocateCommandBuffers(mDevice, &commandBufferAllocateInfo,
                                       mCommandBuffers.data()) == VK_SUCCESS);
@@ -1151,15 +1140,12 @@ void Renderer::createSemaphore(VkSemaphore* outSemaphore) {
 }
 
 void Renderer::createSemaphores() {
-    mAcquireSemaphores.resize(mImageCount, VK_NULL_HANDLE);
-    mRenderSemaphores.resize(mImageCount, VK_NULL_HANDLE);
-    for (int i = 0; i < mImageCount; i++) {
+    mAcquireSemaphores.resize(kInflight, VK_NULL_HANDLE);
+    mRenderSemaphores.resize(kInflight, VK_NULL_HANDLE);
+    for (int i = 0; i < kInflight; i++) {
         createSemaphore(&mAcquireSemaphores[i]);
         createSemaphore(&mRenderSemaphores[i]);
     }
-
-    createSemaphore(&mFreeAcquireSemaphore);
-    createSemaphore(&mFreeRenderSemaphore);
 
     ALOGD("Successfully created semaphores");
 }
@@ -1231,14 +1217,15 @@ void Renderer::createFramebuffer(uint32_t index) {
     ALOGD("Successfully created framebuffer[%u]", index);
 }
 
-void Renderer::recordCommandBuffer(uint32_t index) {
+void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     const VkCommandBufferBeginInfo commandBufferBeginInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             .pNext = nullptr,
             .flags = 0,
             .pInheritanceInfo = nullptr,
     };
-    ASSERT(mVk.BeginCommandBuffer(mCommandBuffers[index], &commandBufferBeginInfo) == VK_SUCCESS);
+    ASSERT(mVk.BeginCommandBuffer(mCommandBuffers[frameIndex], &commandBufferBeginInfo) ==
+           VK_SUCCESS);
 
     const VkClearValue clearVals = {
             .color.float32[0] = 0.5F,
@@ -1250,7 +1237,7 @@ void Renderer::recordCommandBuffer(uint32_t index) {
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
             .pNext = nullptr,
             .renderPass = mRenderPass,
-            .framebuffer = mFramebuffers[index],
+            .framebuffer = mFramebuffers[imageIndex],
             .renderArea =
                     {
                             .offset =
@@ -1267,20 +1254,20 @@ void Renderer::recordCommandBuffer(uint32_t index) {
             .clearValueCount = 1,
             .pClearValues = &clearVals,
     };
-    mVk.CmdBeginRenderPass(mCommandBuffers[index], &renderPassBeginInfo,
+    mVk.CmdBeginRenderPass(mCommandBuffers[frameIndex], &renderPassBeginInfo,
                            VK_SUBPASS_CONTENTS_INLINE);
 
-    mVk.CmdBindPipeline(mCommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
+    mVk.CmdBindPipeline(mCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
 
-    mVk.CmdBindDescriptorSets(mCommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS,
+    mVk.CmdBindDescriptorSets(mCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
                               mPipelineLayout, 0, 1, &mDescriptorSet, 0, nullptr);
 
     VkDeviceSize offset = 0;
-    mVk.CmdBindVertexBuffers(mCommandBuffers[index], 0, 1, &mVertexBuffer, &offset);
+    mVk.CmdBindVertexBuffers(mCommandBuffers[frameIndex], 0, 1, &mVertexBuffer, &offset);
 
-    mVk.CmdDraw(mCommandBuffers[index], 4, 1, 0, 0);
+    mVk.CmdDraw(mCommandBuffers[frameIndex], 4, 1, 0, 0);
 
-    mVk.CmdEndRenderPass(mCommandBuffers[index]);
+    mVk.CmdEndRenderPass(mCommandBuffers[frameIndex]);
 
-    ASSERT(mVk.EndCommandBuffer(mCommandBuffers[index]) == VK_SUCCESS);
+    ASSERT(mVk.EndCommandBuffer(mCommandBuffers[frameIndex]) == VK_SUCCESS);
 }

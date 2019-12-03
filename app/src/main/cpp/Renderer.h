@@ -53,7 +53,7 @@ private:
     void createFences();
     void createImageView(uint32_t index);
     void createFramebuffer(uint32_t index);
-    void recordCommandBuffer(uint32_t index);
+    void recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex);
 
     // Helper member for Vulkan entry points
     VkHelper mVk;
@@ -75,7 +75,6 @@ private:
     uint32_t mHeight = 0;
     VkSurfaceTransformFlagBitsKHR mPreTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
-    uint32_t mImageCount = 0;
     uint32_t mFrameCount = 0;
     std::vector<VkImage> mImages;
     std::vector<VkImageView> mImageViews;
@@ -101,8 +100,6 @@ private:
     std::vector<VkCommandBuffer> mCommandBuffers;
 
     // Semaphores for synchronization
-    VkSemaphore mFreeAcquireSemaphore = VK_NULL_HANDLE;
-    VkSemaphore mFreeRenderSemaphore = VK_NULL_HANDLE;
     std::vector<VkSemaphore> mAcquireSemaphores;
     std::vector<VkSemaphore> mRenderSemaphores;
 

@@ -8,9 +8,9 @@
 class VkHelper {
 public:
     explicit VkHelper() {}
-    void initializeGlobalApis();
-    void initializeInstanceApis(VkInstance instance);
-    void initializeDeviceApis(VkDevice device);
+    void initializeGlobalApi();
+    void initializeInstanceApi(VkInstance instance);
+    void initializeDeviceApi(VkDevice device);
 
     // GET_PROC functions
     PFN_vkCreateInstance CreateInstance = nullptr;
@@ -92,6 +92,7 @@ public:
     PFN_vkMapMemory MapMemory = nullptr;
     PFN_vkQueuePresentKHR QueuePresentKHR = nullptr;
     PFN_vkQueueSubmit QueueSubmit = nullptr;
+    PFN_vkResetFences ResetFences = nullptr;
     PFN_vkUnmapMemory UnmapMemory = nullptr;
     PFN_vkUpdateDescriptorSets UpdateDescriptorSets = nullptr;
     PFN_vkWaitForFences WaitForFences = nullptr;

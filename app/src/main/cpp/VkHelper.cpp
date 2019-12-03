@@ -4,13 +4,13 @@
 #define GET_INST_PROC(F) F = reinterpret_cast<PFN_vk##F>(vkGetInstanceProcAddr(instance, "vk" #F))
 #define GET_DEV_PROC(F) F = reinterpret_cast<PFN_vk##F>(GetDeviceProcAddr(device, "vk" #F))
 
-void VkHelper::initializeGlobalApis() {
+void VkHelper::initializeGlobalApi() {
     GET_PROC(CreateInstance);
     GET_PROC(EnumerateInstanceExtensionProperties);
     GET_PROC(EnumerateInstanceVersion);
 }
 
-void VkHelper::initializeInstanceApis(VkInstance instance) {
+void VkHelper::initializeInstanceApi(VkInstance instance) {
     GET_INST_PROC(CreateAndroidSurfaceKHR);
     GET_INST_PROC(CreateDevice);
     GET_INST_PROC(DestroyInstance);
@@ -26,7 +26,7 @@ void VkHelper::initializeInstanceApis(VkInstance instance) {
     GET_INST_PROC(GetPhysicalDeviceSurfaceCapabilitiesKHR);
 }
 
-void VkHelper::initializeDeviceApis(VkDevice device) {
+void VkHelper::initializeDeviceApi(VkDevice device) {
     GET_DEV_PROC(AcquireNextImageKHR);
     GET_DEV_PROC(AllocateCommandBuffers);
     GET_DEV_PROC(AllocateDescriptorSets);
@@ -86,6 +86,7 @@ void VkHelper::initializeDeviceApis(VkDevice device) {
     GET_DEV_PROC(MapMemory);
     GET_DEV_PROC(QueuePresentKHR);
     GET_DEV_PROC(QueueSubmit);
+    GET_DEV_PROC(ResetFences);
     GET_DEV_PROC(UnmapMemory);
     GET_DEV_PROC(UpdateDescriptorSets);
     GET_DEV_PROC(WaitForFences);
