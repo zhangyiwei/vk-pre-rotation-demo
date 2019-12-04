@@ -42,6 +42,8 @@ void VkHelper::initializeDeviceApi(VkDevice device) {
     GET_DEV_PROC(CmdDraw);
     GET_DEV_PROC(CmdEndRenderPass);
     GET_DEV_PROC(CmdPipelineBarrier);
+    GET_DEV_PROC(CmdSetScissor);
+    GET_DEV_PROC(CmdSetViewport);
     GET_DEV_PROC(CreateBuffer);
     GET_DEV_PROC(CreateCommandPool);
     GET_DEV_PROC(CreateDescriptorPool);
