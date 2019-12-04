@@ -2,17 +2,16 @@
 
 #include "Utils.h"
 
-bool Engine::isAnimating() {
+bool Engine::isReady() {
     std::lock_guard<std::mutex> lock(mLock);
-    return mState.isAnimating;
+    return mIsRendererReady;
 }
 
 void Engine::drawFrame() {
     std::lock_guard<std::mutex> lock(mLock);
-    if (!mState.isAnimating || !mIsRendererReady) {
-        return;
+    if (mIsRendererReady) {
+        mRenderer.drawFrame();
     }
-    mRenderer.drawFrame();
 }
 
 void Engine::onInitWindow(ANativeWindow* window, AAssetManager* assetManager) {
@@ -20,18 +19,6 @@ void Engine::onInitWindow(ANativeWindow* window, AAssetManager* assetManager) {
     ALOGD("%s", __FUNCTION__);
     mRenderer.initialize(window, assetManager);
     mIsRendererReady = true;
-}
-
-void Engine::onLostFocus() {
-    std::lock_guard<std::mutex> lock(mLock);
-    ALOGD("%s", __FUNCTION__);
-    mState.isAnimating = false;
-}
-
-void Engine::onGainedFocus() {
-    std::lock_guard<std::mutex> lock(mLock);
-    ALOGD("%s", __FUNCTION__);
-    mState.isAnimating = true;
 }
 
 void Engine::onTermWindow() {

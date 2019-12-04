@@ -11,18 +11,15 @@ private:
     struct State {
         int32_t inputX;
         int32_t inputY;
-        bool isAnimating;
 
-        State() : inputX(0), inputY(0), isAnimating(false) {}
+        State() : inputX(0), inputY(0) {}
     };
 
 public:
     explicit Engine() : mIsRendererReady(false) {}
-    bool isAnimating();
+    bool isReady();
     void drawFrame();
     void onInitWindow(ANativeWindow* window, AAssetManager* assetManager);
-    void onLostFocus();
-    void onGainedFocus();
     void onTermWindow();
     void onSaveState(void** outSavedState, size_t* outSize);
     void onStart(void* savedState);

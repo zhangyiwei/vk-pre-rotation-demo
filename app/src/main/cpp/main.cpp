@@ -29,11 +29,9 @@ static void handleAppCmd(android_app* app, int32_t cmd) {
             break;
         case APP_CMD_GAINED_FOCUS:
             ALOGD("APP_CMD_GAINED_FOCUS");
-            engine->onGainedFocus();
             break;
         case APP_CMD_LOST_FOCUS:
             ALOGD("APP_CMD_LOST_FOCUS");
-            engine->onLostFocus();
             break;
         case APP_CMD_CONFIG_CHANGED:
             ALOGD("APP_CMD_CONFIG_CHANGED");
@@ -103,8 +101,7 @@ void android_main(android_app* app) {
         // If not animating, we will block forever waiting for events.
         // If animating, we loop until all events are read, then continue
         // to draw the next frame of animation.
-        while (ALooper_pollAll(engine.isAnimating() ? 0 : -1, nullptr, &events, (void**)&source) >=
-               0) {
+        while (ALooper_pollAll(engine.isReady() ? 0 : -1, nullptr, &events, (void**)&source) >= 0) {
             if (source != nullptr) {
                 source->process(app, source);
             }
