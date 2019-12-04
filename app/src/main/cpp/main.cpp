@@ -42,7 +42,7 @@ static void handleAppCmd(android_app* app, int32_t cmd) {
         case APP_CMD_START:
             ALOGD("APP_CMD_START");
             if (app->savedState != nullptr) {
-                engine->onStart(app->savedState);
+                engine->onLoadState(app->savedState);
             }
             break;
         case APP_CMD_RESUME:

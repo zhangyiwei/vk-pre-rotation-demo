@@ -22,7 +22,7 @@ public:
     void onInitWindow(ANativeWindow* window, AAssetManager* assetManager);
     void onTermWindow();
     void onSaveState(void** outSavedState, size_t* outSize);
-    void onStart(void* savedState);
+    void onLoadState(void* savedState);
     int32_t onInputEvent(AInputEvent* event);
 
 private:

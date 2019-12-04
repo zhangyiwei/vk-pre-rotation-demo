@@ -36,7 +36,7 @@ void Engine::onSaveState(void** outSavedState, size_t* outSize) {
     memcpy(*outSavedState, &mState, *outSize);
 }
 
-void Engine::onStart(void* savedState) {
+void Engine::onLoadState(void* savedState) {
     std::lock_guard<std::mutex> lock(mLock);
     ALOGD("%s", __FUNCTION__);
     if (savedState) {
