@@ -26,16 +26,19 @@ void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
 }
 
 void Renderer::drawFrame() {
+    // mInflightFences are created in the signaled state, so we can wait here from the beginning.
     const uint32_t frameIndex = mFrameCount % kInflight;
     ASSERT(mVk.WaitForFences(mDevice, 1, &mInflightFences[frameIndex], VK_TRUE, kTimeout30Sec) ==
            VK_SUCCESS);
 
+    // Need to reset fences to unsignaled state for vkQueueSubmit
     ASSERT(mVk.ResetFences(mDevice, 1, &mInflightFences[frameIndex]) == VK_SUCCESS);
 
     uint32_t imageIndex;
     ASSERT(mVk.AcquireNextImageKHR(mDevice, mSwapchain, UINT64_MAX, mAcquireSemaphores[frameIndex],
                                    VK_NULL_HANDLE, &imageIndex) == VK_SUCCESS);
 
+    // Lazy allocate VkImageView and VkFramebuffer only when needed, and reuse later
     if (mFramebuffers[imageIndex] == VK_NULL_HANDLE) {
         createFramebuffer(imageIndex);
     }
@@ -68,12 +71,13 @@ void Renderer::drawFrame() {
     };
     VkResult ret = mVk.QueuePresentKHR(mQueue, &presentInfo);
 
+    // If there's old swapchain to be destroyed, check if we have reached the retire frame count
     if (mOldSwapchain != VK_NULL_HANDLE && mRetireFrame == mFrameCount) {
         destroyOldSwapchain();
     }
 
-    // VK_SUBOPTIMAL_KHR shouldn't occur again within kInflight frames. If it happens, will switch
-    // to an array later to save the obsolete swapchain stuff
+    // VK_SUBOPTIMAL_KHR shouldn't occur again within kInflight frames in the real world. If that
+    // happens, will switch to an array later to save the old swapchain stuff
     if (ret == VK_SUBOPTIMAL_KHR) {
         mOldSwapchain = mSwapchain;
         mSwapchain = VK_NULL_HANDLE;
@@ -83,13 +87,18 @@ void Renderer::drawFrame() {
 
         mRetireFrame = mFrameCount + kInflight;
 
-        // Recreate the new swapchain with the latest preTransform
+        // Recreate the new swapchain with the latest preTransform. Number of swapchain images,
+        // image views and framebuffers is allowed to change. We can't forbid the presentation
+        // engine from changing the transform bit by 90 or 270 given the required landscape bit is
+        // virtualized on top of the window system, which is why both viewport and scissor have to
+        // be dynamic in the graphics pipeline.
         createSwapchain(mOldSwapchain);
         ALOGD("%s[%u][%d] - recreated swapchain", __FUNCTION__, mFrameCount, ret);
     } else {
         ASSERT(ret == VK_SUCCESS);
     }
 
+    // Increase the frame count here and log at a frame interval
     if (++mFrameCount % kLogInterval == 0) {
         ALOGD("%s[%u][%d]", __FUNCTION__, mFrameCount, ret);
     }
@@ -99,21 +108,21 @@ void Renderer::destroy() {
     if (mDevice != VK_NULL_HANDLE) {
         mVk.DeviceWaitIdle(mDevice);
 
+        // Destroy sync objects
         for (auto& fence : mInflightFences) {
             mVk.DestroyFence(mDevice, fence, nullptr);
         }
         mInflightFences.clear();
-
         for (auto& semaphore : mAcquireSemaphores) {
             mVk.DestroySemaphore(mDevice, semaphore, nullptr);
         }
         mAcquireSemaphores.clear();
-
         for (auto& semaphore : mRenderSemaphores) {
             mVk.DestroySemaphore(mDevice, semaphore, nullptr);
         }
         mRenderSemaphores.clear();
 
+        // Destroy command buffers
         if (!mCommandBuffers.empty()) {
             mVk.FreeCommandBuffers(mDevice, mCommandPool, mCommandBuffers.size(),
                                    mCommandBuffers.data());
@@ -122,23 +131,28 @@ void Renderer::destroy() {
         mVk.DestroyCommandPool(mDevice, mCommandPool, nullptr);
         mCommandPool = VK_NULL_HANDLE;
 
+        // Destroy vertex buffer
         mVk.DestroyBuffer(mDevice, mVertexBuffer, nullptr);
         mVertexBuffer = VK_NULL_HANDLE;
         mVk.FreeMemory(mDevice, mVertexMemory, nullptr);
         mVertexMemory = VK_NULL_HANDLE;
 
+        // Destroy graphics pipeline
         mVk.DestroyPipeline(mDevice, mPipeline, nullptr);
         mPipeline = VK_NULL_HANDLE;
         mVk.DestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
         mPipelineLayout = VK_NULL_HANDLE;
 
+        // Destroy render pass
         mVk.DestroyRenderPass(mDevice, mRenderPass, nullptr);
         mRenderPass = VK_NULL_HANDLE;
 
+        // Destroy descriptor sets
         mVk.FreeDescriptorSets(mDevice, mDescriptorPool, 1, &mDescriptorSet);
         mVk.DestroyDescriptorPool(mDevice, mDescriptorPool, nullptr);
         mVk.DestroyDescriptorSetLayout(mDevice, mDescriptorSetLayout, nullptr);
 
+        // Destroy textures
         for (auto& texture : mTextures) {
             mVk.DestroyImageView(mDevice, texture.view, nullptr);
             mVk.DestroySampler(mDevice, texture.sampler, nullptr);
@@ -147,30 +161,32 @@ void Renderer::destroy() {
         }
         mTextures.clear();
 
+        // Destroy old swapchain
         destroyOldSwapchain();
 
+        // Destroy current swapchain
         for (auto& imageView : mImageViews) {
             mVk.DestroyImageView(mDevice, imageView, nullptr);
         }
         mImageViews.clear();
-
         for (auto& framebuffer : mFramebuffers) {
             mVk.DestroyFramebuffer(mDevice, framebuffer, nullptr);
         }
         mFramebuffers.clear();
-
         mImages.clear();
-
         mVk.DestroySwapchainKHR(mDevice, mSwapchain, nullptr);
 
+        // Destroy device
         mVk.DestroyDevice(mDevice, nullptr);
         mDevice = VK_NULL_HANDLE;
     }
 
     if (mInstance) {
+        // Destroy surface
         mVk.DestroySurfaceKHR(mInstance, mSurface, nullptr);
         mSurface = VK_NULL_HANDLE;
 
+        // Destroy instance
         mVk.DestroyInstance(mInstance, nullptr);
         mInstance = VK_NULL_HANDLE;
     }
