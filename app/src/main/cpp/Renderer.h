@@ -2,6 +2,7 @@
 
 #include <android_native_app_glue.h>
 
+#include <glm/glm.hpp>
 #include <vector>
 
 #include "VkHelper.h"
@@ -23,6 +24,11 @@ private:
                 view(VK_NULL_HANDLE),
                 width(0),
                 height(0) {}
+    };
+
+    struct ConstantBlock {
+        glm::vec2 scale;
+        glm::mat2 rotate;
     };
 
 public:

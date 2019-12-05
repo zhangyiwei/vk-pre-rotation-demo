@@ -1,10 +1,16 @@
 #version 400
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
-layout (location = 0) in vec4 pos;
-layout (location = 1) in vec2 texpos;
-layout (location = 0) out vec2 texcoord;
+
+layout (push_constant) uniform PushConstants {
+   vec2 scale;
+   mat2 rotate;
+} pushConstants;
+layout (location = 0) in vec2 inVertPos;
+layout (location = 1) in vec2 inTexPos;
+layout (location = 0) out vec2 outTexPos;
+
 void main() {
-   texcoord = texpos;
-   gl_Position = pos;
+   outTexPos = pushConstants.rotate * inTexPos;
+   gl_Position = vec4(pushConstants.scale * inVertPos, 0.0, 1.0);
 }

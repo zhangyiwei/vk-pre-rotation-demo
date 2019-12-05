@@ -1,6 +1,6 @@
 #include "Renderer.h"
 
-#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
@@ -366,8 +366,8 @@ void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
     mHeight = surfaceCapabilities.currentExtent.height;
     mPreTransform = surfaceCapabilities.currentTransform;
 
-    if (mPreTransform &
-        (VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR)) {
+    if (mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
+        mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
         mWidth ^= mHeight;
         mHeight ^= mWidth;
         mWidth ^= mHeight;
@@ -905,14 +905,19 @@ void Renderer::createRenderPass() {
 }
 
 void Renderer::createGraphicsPipeline() {
+    const VkPushConstantRange pushConstantRange = {
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .offset = 0,
+            .size = sizeof(ConstantBlock),
+    };
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .pNext = nullptr,
             .flags = 0,
             .setLayoutCount = 1,
             .pSetLayouts = &mDescriptorSetLayout,
-            .pushConstantRangeCount = 0,
-            .pPushConstantRanges = nullptr,
+            .pushConstantRangeCount = 1,
+            .pPushConstantRanges = &pushConstantRange,
     };
     ASSERT(mVk.CreatePipelineLayout(mDevice, &pipelineLayoutCreateInfo, nullptr,
                                     &mPipelineLayout) == VK_SUCCESS);
@@ -1086,17 +1091,11 @@ void Renderer::createGraphicsPipeline() {
 }
 
 void Renderer::createVertexBuffer() {
-    // Calculate the vertex data for the only texture in this demo
-    const float scaleW = mWidth / (float)mTextures[0].width;
-    const float scaleH = mHeight / (float)mTextures[0].height;
-    const float scale = scaleW < scaleH ? scaleW : scaleH;
-    const float xPos = scale / scaleW;
-    const float yPos = scale / scaleH;
     const float vertexData[20] = {
-            -xPos, -yPos, 0.0F, 0.0F, 0.0F, // LT
-            -xPos, yPos,  0.0F, 0.0F, 1.0F, // LB
-            xPos,  -yPos, 0.0F, 1.0F, 0.0F, // RT
-            xPos,  yPos,  0.0F, 1.0F, 1.0F, // RB
+            -1.0F, -1.0F, 0.0F, 0.0F, 0.0F, // LT
+            -1.0F, 1.0F,  0.0F, 0.0F, 1.0F, // LB
+            1.0F,  -1.0F, 0.0F, 1.0F, 0.0F, // RT
+            1.0F,  1.0F,  0.0F, 1.0F, 1.0F, // RB
     };
 
     const uint32_t queueFamilyIndex = mQueueFamilyIndex;
@@ -1279,12 +1278,47 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     mVk.CmdBeginRenderPass(mCommandBuffers[frameIndex], &renderPassBeginInfo,
                            VK_SUBPASS_CONTENTS_INLINE);
 
+    // Calculate the viewport scale factor
+    uint32_t texWidth = mTextures[0].width;
+    uint32_t texHeight = mTextures[0].height;
+    if (mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
+        mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
+        texWidth ^= texHeight;
+        texHeight ^= texWidth;
+        texWidth ^= texHeight;
+    }
+    const float scaleW = mWidth / (float)texWidth;
+    const float scaleH = mHeight / (float)texHeight;
+    const float scale = scaleW < scaleH ? scaleW : scaleH;
+    // Calculate the rotation 2x2 matrix
+    float rotate = 0.0F;
+    switch (mPreTransform) {
+        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+            rotate = 90.0F;
+            break;
+        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+            rotate = 180.0F;
+            break;
+        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+            rotate = 270.0F;
+            break;
+        default:
+            break;
+    }
+    const ConstantBlock constantBlock = {
+            .scale = glm::vec2(scale / scaleW, scale / scaleH),
+            .rotate = glm::rotate(glm::mat4(1.0F), glm::radians(rotate),
+                                  glm::vec3(0.0F, 0.0F, -1.0F)),
+    };
+    mVk.CmdPushConstants(mCommandBuffers[frameIndex], mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                         0, sizeof(ConstantBlock), &constantBlock);
+
     mVk.CmdBindPipeline(mCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
 
     mVk.CmdBindDescriptorSets(mCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
                               mPipelineLayout, 0, 1, &mDescriptorSet, 0, nullptr);
 
-    VkDeviceSize offset = 0;
+    const VkDeviceSize offset = 0;
     mVk.CmdBindVertexBuffers(mCommandBuffers[frameIndex], 0, 1, &mVertexBuffer, &offset);
 
     mVk.CmdDraw(mCommandBuffers[frameIndex], 4, 1, 0, 0);
