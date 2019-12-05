@@ -978,6 +978,35 @@ void Renderer::createGraphicsPipeline() {
             .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
             .primitiveRestartEnable = VK_FALSE,
     };
+    const VkViewport viewport = {
+            .x = 0.0F,
+            .y = 0.0F,
+            .width = (float)mWidth,
+            .height = (float)mHeight,
+            .minDepth = 0.0F,
+            .maxDepth = 1.0F,
+    };
+    const VkRect2D scissor = {
+            .offset =
+                    {
+                            .x = 0,
+                            .y = 0,
+                    },
+            .extent =
+                    {
+                            .width = mWidth,
+                            .height = mHeight,
+                    },
+    };
+    const VkPipelineViewportStateCreateInfo viewportInfo = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .viewportCount = 1,
+            .pViewports = &viewport,
+            .scissorCount = 1,
+            .pScissors = &scissor,
+    };
     const VkPipelineRasterizationStateCreateInfo rasterInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
             .pNext = nullptr,
@@ -1026,17 +1055,6 @@ void Renderer::createGraphicsPipeline() {
             .pAttachments = &attachmentStates,
             .blendConstants = {0.0F, 0.0F, 0.0F, 0.0F},
     };
-    const VkDynamicState dynamicStates[2] = {
-            VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_SCISSOR,
-    };
-    const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0,
-            .dynamicStateCount = 2,
-            .pDynamicStates = dynamicStates,
-    };
     const VkGraphicsPipelineCreateInfo pipelineCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
             .pNext = nullptr,
@@ -1046,12 +1064,12 @@ void Renderer::createGraphicsPipeline() {
             .pVertexInputState = &vertexInputInfo,
             .pInputAssemblyState = &inputAssemblyInfo,
             .pTessellationState = nullptr,
-            .pViewportState = nullptr,
+            .pViewportState = &viewportInfo,
             .pRasterizationState = &rasterInfo,
             .pMultisampleState = &multisampleInfo,
             .pDepthStencilState = nullptr,
             .pColorBlendState = &colorBlendInfo,
-            .pDynamicState = &dynamicStateCreateInfo,
+            .pDynamicState = nullptr,
             .layout = mPipelineLayout,
             .renderPass = mRenderPass,
             .subpass = 0,
@@ -1265,30 +1283,6 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
 
     mVk.CmdBindDescriptorSets(mCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS,
                               mPipelineLayout, 0, 1, &mDescriptorSet, 0, nullptr);
-
-    const VkViewport viewport = {
-            .x = 0.0F,
-            .y = 0.0F,
-            .width = (float)mWidth,
-            .height = (float)mHeight,
-            .minDepth = 0.0F,
-            .maxDepth = 1.0F,
-    };
-    mVk.CmdSetViewport(mCommandBuffers[frameIndex], 0, 1, &viewport);
-
-    const VkRect2D scissor = {
-            .offset =
-                    {
-                            .x = 0,
-                            .y = 0,
-                    },
-            .extent =
-                    {
-                            .width = mWidth,
-                            .height = mHeight,
-                    },
-    };
-    mVk.CmdSetScissor(mCommandBuffers[frameIndex], 0, 1, &scissor);
 
     VkDeviceSize offset = 0;
     mVk.CmdBindVertexBuffers(mCommandBuffers[frameIndex], 0, 1, &mVertexBuffer, &offset);
