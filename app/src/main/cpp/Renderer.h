@@ -2,10 +2,10 @@
 
 #include <android_native_app_glue.h>
 
-#include <glm/glm.hpp>
 #include <vector>
 
 #include "VkHelper.h"
+#include "glm/glm.hpp"
 
 class Renderer {
 private:

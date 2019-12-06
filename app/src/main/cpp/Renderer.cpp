@@ -1,10 +1,11 @@
 #include "Renderer.h"
 
-#include <glm/gtc/matrix_transform.hpp>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
+#include <algorithm>
 
 #include "Utils.h"
+#include "glm/gtc/matrix_transform.hpp"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
 
 /* Public APIs start here */
 void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
@@ -25,6 +26,8 @@ void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     createFences();
 }
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "err_ovl_no_viable_member_function_in_call"
 void Renderer::drawFrame() {
     // mInflightFences are created in the signaled state, so we can wait here from the beginning.
     const uint32_t frameIndex = mFrameCount % kInflight;
@@ -79,8 +82,7 @@ void Renderer::drawFrame() {
     // VK_SUBOPTIMAL_KHR shouldn't occur again within kInflight frames in the real world. If that
     // happens, will switch to an array later to save the old swapchain stuff
     if (ret == VK_SUBOPTIMAL_KHR) {
-        mOldSwapchain = mSwapchain;
-        mSwapchain = VK_NULL_HANDLE;
+        std::swap(mSwapchain, mOldSwapchain);
         std::swap(mImages, mOldImages);
         std::swap(mImageViews, mOldImageViews);
         std::swap(mFramebuffers, mOldFramebuffers);
@@ -103,6 +105,7 @@ void Renderer::drawFrame() {
         ALOGD("%s[%u][%d]", __FUNCTION__, mFrameCount, ret);
     }
 }
+#pragma clang diagnostic pop
 
 void Renderer::destroy() {
     if (mDevice != VK_NULL_HANDLE) {
@@ -354,6 +357,8 @@ void Renderer::createSurface(ANativeWindow* window) {
     ALOGD("Successfully created surface");
 }
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "err_ovl_no_viable_member_function_in_call"
 void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     ASSERT(mVk.GetPhysicalDeviceSurfaceCapabilitiesKHR(mGpu, mSurface, &surfaceCapabilities) ==
@@ -368,9 +373,7 @@ void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
 
     if (mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
         mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
-        mWidth ^= mHeight;
-        mHeight ^= mWidth;
-        mWidth ^= mHeight;
+        std::swap(mWidth, mHeight);
     }
 
     const VkSwapchainCreateInfoKHR swapchainCreateInfo = {
@@ -413,6 +416,7 @@ void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
 
     ALOGD("Successfully created swapchain");
 }
+#pragma clang diagnostic pop
 
 static std::vector<char> readFileFromAsset(AAssetManager* assetManager, const char* filePath,
                                            int mode) {
