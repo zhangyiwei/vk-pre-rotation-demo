@@ -949,14 +949,14 @@ void Renderer::createGraphicsPipeline() {
     };
     const VkVertexInputBindingDescription vertexInputBindingDescription = {
             .binding = 0,
-            .stride = 5 * sizeof(float),
+            .stride = 4 * sizeof(float),
             .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     };
     const VkVertexInputAttributeDescription vertexInputAttributeDescriptions[2] = {
             {
                     .location = 0,
                     .binding = 0,
-                    .format = VK_FORMAT_R32G32B32_SFLOAT,
+                    .format = VK_FORMAT_R32G32_SFLOAT,
                     .offset = 0,
             },
             {
@@ -964,7 +964,7 @@ void Renderer::createGraphicsPipeline() {
                     .location = 1,
                     .binding = 0,
                     .format = VK_FORMAT_R32G32_SFLOAT,
-                    .offset = sizeof(float) * 3,
+                    .offset = sizeof(float) * 2,
             },
     };
     const VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
@@ -1091,11 +1091,11 @@ void Renderer::createGraphicsPipeline() {
 }
 
 void Renderer::createVertexBuffer() {
-    const float vertexData[20] = {
-            -1.0F, -1.0F, 0.0F, 0.0F, 0.0F, // LT
-            -1.0F, 1.0F,  0.0F, 0.0F, 1.0F, // LB
-            1.0F,  -1.0F, 0.0F, 1.0F, 0.0F, // RT
-            1.0F,  1.0F,  0.0F, 1.0F, 1.0F, // RB
+    const float vertexData[16] = {
+            -1.0F, -1.0F, 0.0F, 0.0F, // LT
+            -1.0F, 1.0F,  0.0F, 1.0F, // LB
+            1.0F,  -1.0F, 1.0F, 0.0F, // RT
+            1.0F,  1.0F,  1.0F, 1.0F, // RB
     };
 
     const uint32_t queueFamilyIndex = mQueueFamilyIndex;
