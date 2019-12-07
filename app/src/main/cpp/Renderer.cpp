@@ -26,8 +26,6 @@ void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     createFences();
 }
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "err_ovl_no_viable_member_function_in_call"
 void Renderer::drawFrame() {
     // mInflightFences are created in the signaled state, so we can wait here from the beginning.
     const uint32_t frameIndex = mFrameCount % kInflight;
@@ -105,7 +103,6 @@ void Renderer::drawFrame() {
         ALOGD("%s[%u][%d]", __FUNCTION__, mFrameCount, ret);
     }
 }
-#pragma clang diagnostic pop
 
 void Renderer::destroy() {
     if (mDevice != VK_NULL_HANDLE) {
@@ -1282,14 +1279,12 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     mVk.CmdBeginRenderPass(mCommandBuffers[frameIndex], &renderPassBeginInfo,
                            VK_SUBPASS_CONTENTS_INLINE);
 
-    // Calculate the viewport scale factor
+    // Calculate the texture viewport scale factor
     uint32_t texWidth = mTextures[0].width;
     uint32_t texHeight = mTextures[0].height;
     if (mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
         mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
-        texWidth ^= texHeight;
-        texHeight ^= texWidth;
-        texWidth ^= texHeight;
+        std::swap(texWidth, texHeight);
     }
     const float scaleW = mWidth / (float)texWidth;
     const float scaleH = mHeight / (float)texHeight;
