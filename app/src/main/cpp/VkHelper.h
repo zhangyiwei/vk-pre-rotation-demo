@@ -46,6 +46,8 @@ public:
     PFN_vkCmdEndRenderPass CmdEndRenderPass = nullptr;
     PFN_vkCmdPipelineBarrier CmdPipelineBarrier = nullptr;
     PFN_vkCmdPushConstants CmdPushConstants = nullptr;
+    PFN_vkCmdSetScissor CmdSetScissor = nullptr;
+    PFN_vkCmdSetViewport CmdSetViewport = nullptr;
     PFN_vkCreateBuffer CreateBuffer = nullptr;
     PFN_vkCreateCommandPool CreateCommandPool = nullptr;
     PFN_vkCreateDescriptorPool CreateDescriptorPool = nullptr;

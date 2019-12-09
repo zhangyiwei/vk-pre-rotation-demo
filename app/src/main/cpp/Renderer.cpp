@@ -80,20 +80,21 @@ void Renderer::drawFrame() {
     // VK_SUBOPTIMAL_KHR shouldn't occur again within kInflight frames in the real world. If that
     // happens, will switch to an array later to save the old swapchain stuff
     if (ret == VK_SUBOPTIMAL_KHR) {
-        std::swap(mSwapchain, mOldSwapchain);
-        std::swap(mImages, mOldImages);
-        std::swap(mImageViews, mOldImageViews);
-        std::swap(mFramebuffers, mOldFramebuffers);
+        if (is180Rotation() || mFireRecreateSwapchain) {
+            mFireRecreateSwapchain = false;
+            ALOGD("%s[%u][%d] - recreate swapchain", __FUNCTION__, mFrameCount, ret);
+            std::swap(mSwapchain, mOldSwapchain);
+            std::swap(mImages, mOldImages);
+            std::swap(mImageViews, mOldImageViews);
+            std::swap(mFramebuffers, mOldFramebuffers);
 
-        mRetireFrame = mFrameCount + kInflight;
+            mRetireFrame = mFrameCount + kInflight;
 
-        // Recreate the new swapchain with the latest preTransform. Number of swapchain images,
-        // image views and framebuffers is allowed to change. We can't forbid the presentation
-        // engine from changing the transform bit by 90 or 270 given the required landscape bit is
-        // virtualized on top of the window system, which is why both viewport and scissor have to
-        // be dynamic in the graphics pipeline.
-        createSwapchain(mOldSwapchain);
-        ALOGD("%s[%u][%d] - recreated swapchain", __FUNCTION__, mFrameCount, ret);
+            // Recreate the new swapchain with the latest preTransform. Numbers of swapchain images,
+            // image views and framebuffers are also allowed to change. Even the aspect ratio of the
+            // swapchain can change, which requires us to use dynamic viewport and scissor
+            createSwapchain(mOldSwapchain);
+        }
     } else {
         ASSERT(ret == VK_SUCCESS);
     }
@@ -101,6 +102,18 @@ void Renderer::drawFrame() {
     // Increase the frame count here and log at a frame interval
     if (++mFrameCount % kLogInterval == 0) {
         ALOGD("%s[%u][%d]", __FUNCTION__, mFrameCount, ret);
+    }
+}
+
+void Renderer::updateSurface(uint32_t width, uint32_t height) {
+    uint32_t logicalWidth = mWidth;
+    uint32_t logicalHeight = mHeight;
+    if (mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
+        mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
+        std::swap(logicalWidth, logicalHeight);
+    }
+    if (logicalWidth != width || logicalHeight != height) {
+        mFireRecreateSwapchain = true;
     }
 }
 
@@ -354,13 +367,11 @@ void Renderer::createSurface(ANativeWindow* window) {
     ALOGD("Successfully created surface");
 }
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "err_ovl_no_viable_member_function_in_call"
 void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     ASSERT(mVk.GetPhysicalDeviceSurfaceCapabilitiesKHR(mGpu, mSurface, &surfaceCapabilities) ==
            VK_SUCCESS);
-    ALOGD("Current image size: %dx%d\n", surfaceCapabilities.currentExtent.width,
+    ALOGD("Current surface size: %dx%d\n", surfaceCapabilities.currentExtent.width,
           surfaceCapabilities.currentExtent.height);
     ALOGD("Current transform: 0x%x\n", surfaceCapabilities.currentTransform);
 
@@ -413,7 +424,6 @@ void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
 
     ALOGD("Successfully created swapchain");
 }
-#pragma clang diagnostic pop
 
 static std::vector<char> readFileFromAsset(AAssetManager* assetManager, const char* filePath,
                                            int mode) {
@@ -984,35 +994,6 @@ void Renderer::createGraphicsPipeline() {
             .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
             .primitiveRestartEnable = VK_FALSE,
     };
-    const VkViewport viewport = {
-            .x = 0.0F,
-            .y = 0.0F,
-            .width = (float)mWidth,
-            .height = (float)mHeight,
-            .minDepth = 0.0F,
-            .maxDepth = 1.0F,
-    };
-    const VkRect2D scissor = {
-            .offset =
-                    {
-                            .x = 0,
-                            .y = 0,
-                    },
-            .extent =
-                    {
-                            .width = mWidth,
-                            .height = mHeight,
-                    },
-    };
-    const VkPipelineViewportStateCreateInfo viewportInfo = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0,
-            .viewportCount = 1,
-            .pViewports = &viewport,
-            .scissorCount = 1,
-            .pScissors = &scissor,
-    };
     const VkPipelineRasterizationStateCreateInfo rasterInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
             .pNext = nullptr,
@@ -1061,6 +1042,17 @@ void Renderer::createGraphicsPipeline() {
             .pAttachments = &attachmentStates,
             .blendConstants = {0.0F, 0.0F, 0.0F, 0.0F},
     };
+    const VkDynamicState dynamicStates[2] = {
+            VK_DYNAMIC_STATE_VIEWPORT,
+            VK_DYNAMIC_STATE_SCISSOR,
+    };
+    const VkPipelineDynamicStateCreateInfo dynamicInfo = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .dynamicStateCount = 2,
+            .pDynamicStates = dynamicStates,
+    };
     const VkGraphicsPipelineCreateInfo pipelineCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
             .pNext = nullptr,
@@ -1070,12 +1062,12 @@ void Renderer::createGraphicsPipeline() {
             .pVertexInputState = &vertexInputInfo,
             .pInputAssemblyState = &inputAssemblyInfo,
             .pTessellationState = nullptr,
-            .pViewportState = &viewportInfo,
+            .pViewportState = nullptr,
             .pRasterizationState = &rasterInfo,
             .pMultisampleState = &multisampleInfo,
             .pDepthStencilState = nullptr,
             .pColorBlendState = &colorBlendInfo,
-            .pDynamicState = nullptr,
+            .pDynamicState = &dynamicInfo,
             .layout = mPipelineLayout,
             .renderPass = mRenderPass,
             .subpass = 0,
@@ -1279,6 +1271,30 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     mVk.CmdBeginRenderPass(mCommandBuffers[frameIndex], &renderPassBeginInfo,
                            VK_SUBPASS_CONTENTS_INLINE);
 
+    const VkViewport viewport = {
+            .x = 0.0F,
+            .y = 0.0F,
+            .width = (float)mWidth,
+            .height = (float)mHeight,
+            .minDepth = 0.0F,
+            .maxDepth = 1.0F,
+    };
+    mVk.CmdSetViewport(mCommandBuffers[frameIndex], 0, 1, &viewport);
+
+    const VkRect2D scissor = {
+            .offset =
+                    {
+                            .x = 0,
+                            .y = 0,
+                    },
+            .extent =
+                    {
+                            .width = mWidth,
+                            .height = mHeight,
+                    },
+    };
+    mVk.CmdSetScissor(mCommandBuffers[frameIndex], 0, 1, &scissor);
+
     // Calculate the texture viewport scale factor
     uint32_t texWidth = mTextures[0].width;
     uint32_t texHeight = mTextures[0].height;
@@ -1344,4 +1360,24 @@ void Renderer::destroyOldSwapchain() {
     mOldSwapchain = VK_NULL_HANDLE;
 
     ALOGD("Successfully destroyed old swapchain");
+}
+
+bool Renderer::is180Rotation() {
+    VkSurfaceCapabilitiesKHR surfaceCapabilities;
+    ASSERT(mVk.GetPhysicalDeviceSurfaceCapabilitiesKHR(mGpu, mSurface, &surfaceCapabilities) ==
+           VK_SUCCESS);
+    VkSurfaceTransformFlagsKHR currentTransform = surfaceCapabilities.currentTransform;
+    switch (currentTransform) {
+        case VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR:
+            return mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR;
+        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+            return mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR;
+        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+            return mPreTransform == VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+            return mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR;
+        default:
+            break;
+    }
+    return false;
 }

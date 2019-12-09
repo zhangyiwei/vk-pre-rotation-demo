@@ -21,11 +21,21 @@ void Engine::onInitWindow(ANativeWindow* window, AAssetManager* assetManager) {
     mIsRendererReady = true;
 }
 
+void Engine::onWindowResized(uint32_t width, uint32_t height) {
+    std::lock_guard<std::mutex> lock(mLock);
+    if (mIsRendererReady) {
+        ALOGD("%s: W[%u], H[%u]", __FUNCTION__, width, height);
+        mRenderer.updateSurface(width, height);
+    }
+}
+
 void Engine::onTermWindow() {
     std::lock_guard<std::mutex> lock(mLock);
     ALOGD("%s", __FUNCTION__);
-    mRenderer.destroy();
-    mIsRendererReady = false;
+    if (mIsRendererReady) {
+        mRenderer.destroy();
+        mIsRendererReady = false;
+    }
 }
 
 void Engine::onSaveState(void** outSavedState, size_t* outSize) {

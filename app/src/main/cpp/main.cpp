@@ -72,10 +72,15 @@ static int32_t handleInputEvent(android_app* app, AInputEvent* event) {
 }
 
 static void handleNativeWindowResized(ANativeActivity* activity, ANativeWindow* window) {
-    (void)activity;
-    int32_t width = ANativeWindow_getWidth(window);
-    int32_t height = ANativeWindow_getHeight(window);
+    auto engine = static_cast<Engine*>(static_cast<android_app*>(activity->instance)->userData);
+    const int32_t width = ANativeWindow_getWidth(window);
+    const int32_t height = ANativeWindow_getHeight(window);
     ALOGD("%s: W[%d], H[%d]", __FUNCTION__, width, height);
+
+    if (width < 0 || height < 0) {
+        return;
+    }
+    engine->onWindowResized((uint32_t)width, (uint32_t)height);
 }
 
 /**

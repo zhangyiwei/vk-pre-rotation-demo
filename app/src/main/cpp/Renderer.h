@@ -35,6 +35,7 @@ public:
     explicit Renderer() {}
     void initialize(ANativeWindow* window, AAssetManager* assetManager);
     void drawFrame();
+    void updateSurface(uint32_t width, uint32_t height);
     void destroy();
 
 private:
@@ -60,6 +61,7 @@ private:
     void createFramebuffer(uint32_t index);
     void recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex);
     void destroyOldSwapchain();
+    bool is180Rotation();
 
     // Helper member for Vulkan entry points
     VkHelper mVk;
@@ -86,6 +88,7 @@ private:
     std::vector<VkImageView> mImageViews;
     std::vector<VkFramebuffer> mFramebuffers;
     // For swapchain recreation
+    bool mFireRecreateSwapchain = false;
     uint32_t mRetireFrame = 0;
     VkSwapchainKHR mOldSwapchain = VK_NULL_HANDLE;
     std::vector<VkImage> mOldImages;
