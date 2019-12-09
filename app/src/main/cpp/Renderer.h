@@ -89,6 +89,7 @@ private:
     std::vector<VkFramebuffer> mFramebuffers;
     // For swapchain recreation
     bool mFireRecreateSwapchain = false;
+    uint32_t mPreRotationLatency = kPreRotationLatency;
     uint32_t mRetireFrame = 0;
     VkSwapchainKHR mOldSwapchain = VK_NULL_HANDLE;
     std::vector<VkImage> mOldImages;
@@ -139,4 +140,5 @@ private:
     static constexpr const char* kFragmentShaderFile = "texture.frag.spv";
     static constexpr const uint32_t kLogInterval = 100;
     static constexpr const uint64_t kTimeout30Sec = 30000000000;
+    static constexpr const uint32_t kPreRotationLatency = 30;
 };

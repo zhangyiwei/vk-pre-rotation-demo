@@ -80,7 +80,10 @@ void Renderer::drawFrame() {
     // VK_SUBOPTIMAL_KHR shouldn't occur again within kInflight frames in the real world. If that
     // happens, will switch to an array later to save the old swapchain stuff
     if (ret == VK_SUBOPTIMAL_KHR) {
-        if (is180Rotation() || mFireRecreateSwapchain) {
+        // mFireRecreateSwapchain usually comes 3 to 4 frames later after 90 degree rotation, but we
+        // set the countdown latency to 30 to play safe
+        if (is180Rotation() || mFireRecreateSwapchain || !(--mPreRotationLatency)) {
+            mPreRotationLatency = kPreRotationLatency;
             mFireRecreateSwapchain = false;
             ALOGD("%s[%u][%d] - recreate swapchain", __FUNCTION__, mFrameCount, ret);
             std::swap(mSwapchain, mOldSwapchain);
