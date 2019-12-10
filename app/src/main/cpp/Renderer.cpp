@@ -1,6 +1,7 @@
 #include "Renderer.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #define STB_IMAGE_IMPLEMENTATION
@@ -112,13 +113,7 @@ void Renderer::drawFrame() {
 }
 
 void Renderer::updateSurface(uint32_t width, uint32_t height) {
-    uint32_t logicalWidth = mWidth;
-    uint32_t logicalHeight = mHeight;
-    if (mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
-        mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
-        std::swap(logicalWidth, logicalHeight);
-    }
-    if (logicalWidth != width || logicalHeight != height) {
+    if (mSurfaceWidth != width || mSurfaceHeight != height) {
         mFireRecreateSwapchain = true;
     }
 }
@@ -381,13 +376,13 @@ void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
           surfaceCapabilities.currentExtent.height);
     ALOGD("Current transform: 0x%x\n", surfaceCapabilities.currentTransform);
 
-    mWidth = surfaceCapabilities.currentExtent.width;
-    mHeight = surfaceCapabilities.currentExtent.height;
+    mSurfaceWidth = mImageWidth = surfaceCapabilities.currentExtent.width;
+    mSurfaceHeight = mImageHeight = surfaceCapabilities.currentExtent.height;
     mPreTransform = surfaceCapabilities.currentTransform;
 
     if (mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
         mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
-        std::swap(mWidth, mHeight);
+        std::swap(mImageWidth, mImageHeight);
     }
 
     const VkSwapchainCreateInfoKHR swapchainCreateInfo = {
@@ -400,8 +395,8 @@ void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
             .imageColorSpace = mColorSpace,
             .imageExtent =
                     {
-                            .width = mWidth,
-                            .height = mHeight,
+                            .width = mImageWidth,
+                            .height = mImageHeight,
                     },
             .imageArrayLayers = 1,
             .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -925,7 +920,7 @@ void Renderer::createGraphicsPipeline() {
     const VkPushConstantRange pushConstantRange = {
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
             .offset = 0,
-            .size = sizeof(glm::mat4),
+            .size = sizeof(glm::mat2),
     };
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1227,8 +1222,8 @@ void Renderer::createFramebuffer(uint32_t index) {
             .renderPass = mRenderPass,
             .attachmentCount = 1,
             .pAttachments = &mImageViews[index],
-            .width = mWidth,
-            .height = mHeight,
+            .width = mImageWidth,
+            .height = mImageHeight,
             .layers = 1,
     };
     ASSERT(mVk.CreateFramebuffer(mDevice, &framebufferCreateInfo, nullptr, &mFramebuffers[index]) ==
@@ -1267,8 +1262,8 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
                                     },
                             .extent =
                                     {
-                                            .width = mWidth,
-                                            .height = mHeight,
+                                            .width = mImageWidth,
+                                            .height = mImageHeight,
                                     },
                     },
             .clearValueCount = 1,
@@ -1280,8 +1275,8 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     const VkViewport viewport = {
             .x = 0.0F,
             .y = 0.0F,
-            .width = (float)mWidth,
-            .height = (float)mHeight,
+            .width = (float)mImageWidth,
+            .height = (float)mImageHeight,
             .minDepth = 0.0F,
             .maxDepth = 1.0F,
     };
@@ -1295,11 +1290,16 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
                     },
             .extent =
                     {
-                            .width = mWidth,
-                            .height = mHeight,
+                            .width = mImageWidth,
+                            .height = mImageHeight,
                     },
     };
     mVk.CmdSetScissor(mCommandBuffers[frameIndex], 0, 1, &scissor);
+
+    const float scaleW = mSurfaceWidth / (float) mTextures[0].width;
+    const float scaleH = mSurfaceHeight / (float) mTextures[0].height;
+    const float minimalScale = scaleW < scaleH ? scaleW : scaleH;
+    const glm::mat4 scale = glm::scale(glm::mat4(1.0F), glm::vec3(minimalScale / scaleW, minimalScale / scaleH, 1.0F));
 
     float rotate = 0.0F;
     switch (mPreTransform) {
@@ -1315,11 +1315,10 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
         default:
             break;
     }
-    const glm::mat4 mvp =
-            glm::rotate(glm::mat4(1.0F), glm::radians(rotate), glm::vec3(0.0F, 0.0F, 1.0F));
+    const glm::mat2 scaleAndRotate = glm::rotate(glm::mat4(1.0), glm::radians(rotate), glm::vec3(0.0F, 0.0F, 1.0F)) * scale;
 
     mVk.CmdPushConstants(mCommandBuffers[frameIndex], mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                         0, sizeof(glm::mat4), glm::value_ptr(mvp));
+                         0, sizeof(glm::mat2), glm::value_ptr(scaleAndRotate));
 
     mVk.CmdBindPipeline(mCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
 

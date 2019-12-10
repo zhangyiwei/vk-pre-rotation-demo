@@ -73,8 +73,10 @@ private:
     VkSurfaceKHR mSurface = VK_NULL_HANDLE;
     VkFormat mFormat = VK_FORMAT_UNDEFINED;
     VkColorSpaceKHR mColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-    uint32_t mWidth = 0;
-    uint32_t mHeight = 0;
+    uint32_t mSurfaceWidth = 0;
+    uint32_t mSurfaceHeight = 0;
+    uint32_t mImageWidth = 0;
+    uint32_t mImageHeight = 0;
     VkSurfaceTransformFlagBitsKHR mPreTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     uint32_t mFrameCount = 0;
     VkSwapchainKHR mSwapchain = VK_NULL_HANDLE;
