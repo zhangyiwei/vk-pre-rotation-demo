@@ -1231,6 +1231,20 @@ void Renderer::createFramebuffer(uint32_t index) {
     ALOGD("Successfully created framebuffer[%u]", index);
 }
 
+static float transformToRotate(VkSurfaceTransformFlagBitsKHR transform) {
+    switch (transform) {
+        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+            return 90.0F;
+        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+            return 180.0F;
+        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+            return 270.0F;
+        default:
+            break;
+    }
+    return 0.0F;
+}
+
 void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     const VkCommandBufferBeginInfo commandBufferBeginInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -1298,26 +1312,13 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     const float scaleW = mSurfaceWidth / (float) mTextures[0].width;
     const float scaleH = mSurfaceHeight / (float) mTextures[0].height;
     const float minimalScale = scaleW < scaleH ? scaleW : scaleH;
-    const glm::mat4 scale = glm::scale(glm::mat4(1.0F), glm::vec3(minimalScale / scaleW, minimalScale / scaleH, 1.0F));
-
-    float rotate = 0.0F;
-    switch (mPreTransform) {
-        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
-            rotate = 90.0F;
-            break;
-        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
-            rotate = 180.0F;
-            break;
-        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
-            rotate = 270.0F;
-            break;
-        default:
-            break;
-    }
-    const glm::mat2 scaleAndRotate = glm::rotate(glm::mat4(1.0), glm::radians(rotate), glm::vec3(0.0F, 0.0F, 1.0F)) * scale;
-
+    const glm::mat4 rotate =
+            glm::rotate(glm::mat4(1.0), glm::radians(transformToRotate(mPreTransform)),
+                        glm::vec3(0.0F, 0.0F, 1.0F));
+    const glm::mat2 scaleThenRotate =
+            glm::scale(rotate, glm::vec3(minimalScale / scaleW, minimalScale / scaleH, 1.0F));
     mVk.CmdPushConstants(mCommandBuffers[frameIndex], mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                         0, sizeof(glm::mat2), glm::value_ptr(scaleAndRotate));
+                         0, sizeof(glm::mat2), glm::value_ptr(scaleThenRotate));
 
     mVk.CmdBindPipeline(mCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
 
