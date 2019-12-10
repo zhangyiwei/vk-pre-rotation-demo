@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "VkHelper.h"
-#include "glm/glm.hpp"
 
 class Renderer {
 private:
@@ -24,11 +23,6 @@ private:
                 view(VK_NULL_HANDLE),
                 width(0),
                 height(0) {}
-    };
-
-    struct ConstantBlock {
-        glm::vec2 scale;
-        glm::mat2 rotate;
     };
 
 public:

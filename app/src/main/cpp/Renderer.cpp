@@ -1,11 +1,14 @@
 #include "Renderer.h"
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
+
 #include <algorithm>
 
 #include "Utils.h"
-#include "glm/gtc/matrix_transform.hpp"
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
 
 /* Public APIs start here */
 void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
@@ -922,7 +925,7 @@ void Renderer::createGraphicsPipeline() {
     const VkPushConstantRange pushConstantRange = {
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
             .offset = 0,
-            .size = sizeof(ConstantBlock),
+            .size = sizeof(glm::mat4),
     };
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1298,17 +1301,6 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     };
     mVk.CmdSetScissor(mCommandBuffers[frameIndex], 0, 1, &scissor);
 
-    // Calculate the texture viewport scale factor
-    uint32_t texWidth = mTextures[0].width;
-    uint32_t texHeight = mTextures[0].height;
-    if (mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR ||
-        mPreTransform == VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
-        std::swap(texWidth, texHeight);
-    }
-    const float scaleW = mWidth / (float)texWidth;
-    const float scaleH = mHeight / (float)texHeight;
-    const float scale = scaleW < scaleH ? scaleW : scaleH;
-    // Calculate the rotation 2x2 matrix
     float rotate = 0.0F;
     switch (mPreTransform) {
         case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
@@ -1323,13 +1315,11 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
         default:
             break;
     }
-    const ConstantBlock constantBlock = {
-            .scale = glm::vec2(scale / scaleW, scale / scaleH),
-            .rotate = glm::rotate(glm::mat4(1.0F), glm::radians(rotate),
-                                  glm::vec3(0.0F, 0.0F, -1.0F)),
-    };
+    const glm::mat4 mvp =
+            glm::rotate(glm::mat4(1.0F), glm::radians(rotate), glm::vec3(0.0F, 0.0F, 1.0F));
+
     mVk.CmdPushConstants(mCommandBuffers[frameIndex], mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                         0, sizeof(ConstantBlock), &constantBlock);
+                         0, sizeof(glm::mat4), glm::value_ptr(mvp));
 
     mVk.CmdBindPipeline(mCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
 

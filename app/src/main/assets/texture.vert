@@ -3,14 +3,13 @@
 #extension GL_ARB_shading_language_420pack : enable
 
 layout (push_constant) uniform PushConstants {
-   vec2 scale;
-   mat2 rotate;
+   mat4 rotate;
 } pushConstants;
 layout (location = 0) in vec2 inVertPos;
 layout (location = 1) in vec2 inTexPos;
 layout (location = 0) out vec2 outTexPos;
 
 void main() {
-   outTexPos = pushConstants.rotate * inTexPos;
-   gl_Position = vec4(pushConstants.scale * inVertPos, 0.0, 1.0);
+   outTexPos = inTexPos;
+   gl_Position = pushConstants.rotate * vec4(inVertPos, 0.0, 1.0);
 }
