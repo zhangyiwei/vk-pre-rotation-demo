@@ -835,7 +835,7 @@ void Renderer::createDescriptorSet() {
     for (uint32_t i = 0; i < kTextureCount; i++) {
         descriptorImageInfo[i].sampler = mTextures[i].sampler;
         descriptorImageInfo[i].imageView = mTextures[i].view;
-        descriptorImageInfo[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        descriptorImageInfo[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
 
     VkWriteDescriptorSet writeDescriptorSet = {
