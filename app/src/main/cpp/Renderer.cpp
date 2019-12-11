@@ -10,6 +10,11 @@
 
 #include "Utils.h"
 
+struct PushConstantBlock {
+    glm::mat4 mvp;
+    glm::mat2 preRotate;
+};
+
 /* Public APIs start here */
 void Renderer::initialize(ANativeWindow* window, AAssetManager* assetManager) {
     ASSERT(assetManager);
@@ -919,7 +924,7 @@ void Renderer::createGraphicsPipeline() {
     const VkPushConstantRange pushConstantRange = {
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
             .offset = 0,
-            .size = sizeof(glm::mat2),
+            .size = sizeof(PushConstantBlock),
     };
     const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1231,20 +1236,6 @@ void Renderer::createFramebuffer(uint32_t index) {
     ALOGD("Successfully created framebuffer[%u]", index);
 }
 
-static float transformToRotate(VkSurfaceTransformFlagBitsKHR transform) {
-    switch (transform) {
-        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
-            return 90.0F;
-        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
-            return 180.0F;
-        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
-            return 270.0F;
-        default:
-            break;
-    }
-    return 0.0F;
-}
-
 void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     const VkCommandBufferBeginInfo commandBufferBeginInfo = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -1309,16 +1300,38 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     };
     mVk.CmdSetScissor(mCommandBuffers[frameIndex], 0, 1, &scissor);
 
+    // Calculate the simple mvp for this demo
     const float scaleW = mSurfaceWidth / (float) mTextures[0].width;
     const float scaleH = mSurfaceHeight / (float) mTextures[0].height;
     const float minimalScale = scaleW < scaleH ? scaleW : scaleH;
-    const glm::mat4 rotate =
-            glm::rotate(glm::mat4(1.0), glm::radians(transformToRotate(mPreTransform)),
-                        glm::vec3(0.0F, 0.0F, 1.0F));
-    const glm::mat2 scaleThenRotate =
-            glm::scale(rotate, glm::vec3(minimalScale / scaleW, minimalScale / scaleH, 1.0F));
+    const float scaleX = minimalScale / scaleW;
+    const float scaleY = minimalScale / scaleH;
+    const glm::mat4 mvp = glm::scale(glm::mat4(1.0F), glm::vec3(scaleX, scaleY, 1.0F));
+
+    // Generate the simple 2x2 rotation matrix for fixing pre-rotation in the clipping space
+    float radians = 0.0F;
+    switch (mPreTransform) {
+        case VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR:
+            radians = glm::radians(90.0F);
+            break;
+        case VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR:
+            radians = glm::radians(180.0F);
+            break;
+        case VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR:
+            radians = glm::radians(270.0F);
+            break;
+        default:
+            break;
+    }
+    const glm::mat2 preRotate = glm::rotate(glm::mat4(1.0), radians, glm::vec3(0.0F, 0.0F, 1.0F));
+
+    // We can do the preRotate * mvp here, but separate to be explicit in this demo
+    const PushConstantBlock pushConstantBlock = {
+            .mvp = mvp,
+            .preRotate = preRotate,
+    };
     mVk.CmdPushConstants(mCommandBuffers[frameIndex], mPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                         0, sizeof(glm::mat2), glm::value_ptr(scaleThenRotate));
+                         0, sizeof(PushConstantBlock), &pushConstantBlock);
 
     mVk.CmdBindPipeline(mCommandBuffers[frameIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
 
