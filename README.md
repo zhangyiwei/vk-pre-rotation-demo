@@ -1,5 +1,10 @@
 # Vulkan Pre-rotation Demo
 
+## After git clone
+
+1. git submodule init
+2. git submodule update
+
 ## What's covered?
 
 1. Detect all surface rotations in Android 10+(easier if landscape only without resizing).
