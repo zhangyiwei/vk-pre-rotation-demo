@@ -1301,8 +1301,8 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     mVk.CmdSetScissor(mCommandBuffers[frameIndex], 0, 1, &scissor);
 
     // Calculate the simple mvp for this demo
-    const float scaleW = mSurfaceWidth / (float) mTextures[0].width;
-    const float scaleH = mSurfaceHeight / (float) mTextures[0].height;
+    const float scaleW = mSurfaceWidth / (float)mTextures[0].width;
+    const float scaleH = mSurfaceHeight / (float)mTextures[0].height;
     const float minimalScale = scaleW < scaleH ? scaleW : scaleH;
     const float scaleX = minimalScale / scaleW;
     const float scaleY = minimalScale / scaleH;
