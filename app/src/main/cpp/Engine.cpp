@@ -15,23 +15,23 @@ void Engine::drawFrame() {
 }
 
 void Engine::onInitWindow(ANativeWindow* window, AAssetManager* assetManager) {
-    std::lock_guard<std::mutex> lock(mLock);
     ALOGD("%s", __FUNCTION__);
+    std::lock_guard<std::mutex> lock(mLock);
     mRenderer.initialize(window, assetManager);
     mIsRendererReady = true;
 }
 
 void Engine::onWindowResized(uint32_t width, uint32_t height) {
+    ALOGD("%s", __FUNCTION__);
     std::lock_guard<std::mutex> lock(mLock);
     if (mIsRendererReady) {
-        ALOGD("%s: W[%u], H[%u]", __FUNCTION__, width, height);
         mRenderer.updateSurface(width, height);
     }
 }
 
 void Engine::onTermWindow() {
-    std::lock_guard<std::mutex> lock(mLock);
     ALOGD("%s", __FUNCTION__);
+    std::lock_guard<std::mutex> lock(mLock);
     if (mIsRendererReady) {
         mRenderer.destroy();
         mIsRendererReady = false;
@@ -39,28 +39,31 @@ void Engine::onTermWindow() {
 }
 
 void Engine::onSaveState(void** outSavedState, size_t* outSize) {
-    std::lock_guard<std::mutex> lock(mLock);
     ALOGD("%s", __FUNCTION__);
     *outSize = sizeof(State);
     *outSavedState = malloc(*outSize);
+
+    std::lock_guard<std::mutex> lock(mLock);
     memcpy(*outSavedState, &mState, *outSize);
 }
 
 void Engine::onLoadState(void* savedState) {
-    std::lock_guard<std::mutex> lock(mLock);
-    ALOGD("%s", __FUNCTION__);
     if (savedState) {
+        ALOGD("%s", __FUNCTION__);
+        std::lock_guard<std::mutex> lock(mLock);
         memcpy(&mState, savedState, sizeof(State));
-        ALOGD("Restored from previous saved state");
     }
 }
 
 int32_t Engine::onInputEvent(AInputEvent* event) {
-    std::lock_guard<std::mutex> lock(mLock);
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
-        mState.inputX = static_cast<int32_t>(AMotionEvent_getX(event, 0));
-        mState.inputY = static_cast<int32_t>(AMotionEvent_getY(event, 0));
-        ALOGD("%s: X[%d] Y[%d]", __FUNCTION__, mState.inputX, mState.inputY);
+        auto inputX = static_cast<int32_t>(AMotionEvent_getX(event, 0));
+        auto inputY = static_cast<int32_t>(AMotionEvent_getY(event, 0));
+        ALOGD("%s inputX[%d] inputY[%d]", __FUNCTION__, inputX, inputY);
+
+        std::lock_guard<std::mutex> lock(mLock);
+        mState.inputX = inputX;
+        mState.inputY = inputY;
         return 1;
     }
     return 0;

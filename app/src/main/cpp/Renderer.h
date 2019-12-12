@@ -83,7 +83,7 @@ private:
     std::vector<VkImage> mImages;
     std::vector<VkImageView> mImageViews;
     std::vector<VkFramebuffer> mFramebuffers;
-    // For swapchain recreation
+    // For swapchain recreation, old stuff can be refactored to kInflight buffered
     bool mFireRecreateSwapchain = false;
     uint32_t mPreRotationLatency = kPreRotationLatency;
     uint32_t mRetireFrame = 0;
