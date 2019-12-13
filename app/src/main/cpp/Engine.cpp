@@ -68,3 +68,8 @@ int32_t Engine::onInputEvent(AInputEvent* event) {
     }
     return 0;
 }
+
+uint32_t Engine::getDelayMillis(int64_t /*frameTimeNanos*/) {
+    // we can play around with frameTimeNanos to add more dynamic callback delay control
+    return kDelayMillis;
+}

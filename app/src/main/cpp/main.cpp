@@ -1,13 +1,32 @@
+#include <android/choreographer.h>
 #include <android_native_app_glue.h>
 
 #include "Engine.h"
 #include "Utils.h"
+
+static void onChoreographer(int64_t frameTimeNanos, void* data) {
+    if (!data) {
+        return;
+    }
+
+    auto engine = static_cast<Engine*>(data);
+    if (!engine->isReady()) {
+        return;
+    }
+
+    AChoreographer_postFrameCallbackDelayed64(AChoreographer_getInstance(), onChoreographer, engine,
+                                              engine->getDelayMillis(frameTimeNanos));
+
+    engine->drawFrame();
+}
 
 static void handleAppCmd(android_app* app, int32_t cmd) {
     auto engine = static_cast<Engine*>(app->userData);
     switch (cmd) {
         case APP_CMD_INIT_WINDOW:
             engine->onInitWindow(app->window, app->activity->assetManager);
+            AChoreographer_postFrameCallback64(AChoreographer_getInstance(), onChoreographer,
+                                               engine);
             break;
         case APP_CMD_TERM_WINDOW:
             engine->onTermWindow();
@@ -52,11 +71,15 @@ void android_main(android_app* app) {
     app->onInputEvent = handleInputEvent;
     app->activity->callbacks->onNativeWindowResized = handleNativeWindowResized;
 
+    if (AChoreographer_getInstance() == nullptr) {
+        return;
+    }
+
     while (true) {
         int events;
         android_poll_source* source;
 
-        while (ALooper_pollAll(engine.isReady() ? 0 : -1, nullptr, &events, (void**)&source) >= 0) {
+        while (ALooper_pollAll(-1, nullptr, &events, (void**)&source) >= 0) {
             if (source != nullptr) {
                 source->process(app, source);
             }
@@ -67,7 +90,5 @@ void android_main(android_app* app) {
                 return;
             }
         }
-
-        engine.drawFrame();
     }
 }

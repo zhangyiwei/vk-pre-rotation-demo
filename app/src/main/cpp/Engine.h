@@ -25,6 +25,7 @@ public:
     void onSaveState(void** outSavedState, size_t* outSize);
     void onLoadState(void* savedState);
     int32_t onInputEvent(AInputEvent* event);
+    uint32_t getDelayMillis(int64_t frameTimeNanos);
 
 private:
     // mLock protects all members below
@@ -32,4 +33,7 @@ private:
     State mState;
     Renderer mRenderer;
     bool mIsRendererReady;
+
+    // defer 13ms to target 60Hz on a 60Hz display or 45Hz on a 90Hz display
+    static constexpr const uint32_t kDelayMillis = 13;
 };
