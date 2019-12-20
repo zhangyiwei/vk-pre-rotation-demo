@@ -14,7 +14,7 @@ add_library(native_app_glue STATIC
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 target_include_directories(vkdemo PRIVATE ${ANDROID_NDK}/sources/android/native_app_glue)
 
-add_subdirectory(external)
+add_subdirectory(../third_party third_party)
 
 add_definitions("-DVK_USE_PLATFORM_ANDROID_KHR")
 
