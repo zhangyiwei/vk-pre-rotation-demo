@@ -47,24 +47,9 @@ static void handleAppCmd(android_app* app, int32_t cmd) {
         case APP_CMD_TERM_WINDOW:
             engine->onTermWindow();
             break;
-        case APP_CMD_START:
-            ALOGD("APP_CMD_START");
-            if (app->savedState != nullptr) {
-                engine->onLoadState(app->savedState);
-            }
-            break;
-        case APP_CMD_SAVE_STATE:
-            ALOGD("APP_CMD_SAVE_STATE");
-            engine->onSaveState(&app->savedState, &app->savedStateSize);
-            break;
         default:
             break;
     }
-}
-
-static int32_t handleInputEvent(android_app* app, AInputEvent* event) {
-    ALOGV("%s", __FUNCTION__);
-    return static_cast<Engine*>(app->userData)->onInputEvent(event);
 }
 
 static void handleNativeWindowResized(ANativeActivity* activity, ANativeWindow* window) {
@@ -84,7 +69,6 @@ void android_main(android_app* app) {
 
     app->userData = &engine;
     app->onAppCmd = handleAppCmd;
-    app->onInputEvent = handleInputEvent;
     app->activity->callbacks->onNativeWindowResized = handleNativeWindowResized;
 
     if (AChoreographer_getInstance() == nullptr) {

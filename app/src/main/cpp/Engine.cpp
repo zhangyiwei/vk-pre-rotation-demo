@@ -54,37 +54,6 @@ void Engine::onTermWindow() {
     }
 }
 
-void Engine::onSaveState(void** outSavedState, size_t* outSize) {
-    ALOGD("%s", __FUNCTION__);
-    *outSize = sizeof(State);
-    *outSavedState = malloc(*outSize);
-
-    std::lock_guard<std::mutex> lock(mLock);
-    memcpy(*outSavedState, &mState, *outSize);
-}
-
-void Engine::onLoadState(void* savedState) {
-    if (savedState) {
-        ALOGD("%s", __FUNCTION__);
-        std::lock_guard<std::mutex> lock(mLock);
-        memcpy(&mState, savedState, sizeof(State));
-    }
-}
-
-int32_t Engine::onInputEvent(AInputEvent* event) {
-    if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
-        auto inputX = static_cast<int32_t>(AMotionEvent_getX(event, 0));
-        auto inputY = static_cast<int32_t>(AMotionEvent_getY(event, 0));
-        ALOGD("%s inputX[%d] inputY[%d]", __FUNCTION__, inputX, inputY);
-
-        std::lock_guard<std::mutex> lock(mLock);
-        mState.inputX = inputX;
-        mState.inputY = inputY;
-        return 1;
-    }
-    return 0;
-}
-
 uint32_t Engine::getDelayMillis(int64_t /*frameTimeNanos*/) {
     // we can play around with frameTimeNanos to add more dynamic callback delay control
     return kDelayMillis;
