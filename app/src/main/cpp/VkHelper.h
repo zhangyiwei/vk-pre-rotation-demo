@@ -28,6 +28,7 @@ public:
     // GET_PROC functions
     PFN_vkCreateInstance CreateInstance = nullptr;
     PFN_vkEnumerateInstanceExtensionProperties EnumerateInstanceExtensionProperties = nullptr;
+    PFN_vkEnumerateInstanceLayerProperties EnumerateInstanceLayerProperties = nullptr;
     PFN_vkEnumerateInstanceVersion EnumerateInstanceVersion = nullptr;
 
     // GET_INSTANCE_PROC functions

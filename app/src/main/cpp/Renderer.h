@@ -54,9 +54,11 @@ private:
     void createSurface(ANativeWindow* window);
     void createSwapchain(VkSwapchainKHR oldSwapchain);
     uint32_t getMemoryTypeIndex(uint32_t typeBits, VkFlags mask);
-    void setImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldImageLayout,
-                        VkImageLayout newImageLayout, VkPipelineStageFlags srcStages,
-                        VkPipelineStageFlags dstStages);
+    void setImageLayout(VkCommandBuffer commandBuffer, VkImage image,
+                        VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask,
+                        VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
+                        VkPipelineStageFlags srcStages, VkPipelineStageFlags dstStages,
+                        uint32_t srcQueue, uint32_t dstQueue);
     void loadTextureFromFile(const char* filePath, Texture* outTexture);
     void createTextures();
     void createDescriptorSet();
@@ -99,6 +101,11 @@ private:
     std::vector<VkImage> mImages;
     std::vector<VkImageView> mImageViews;
     std::vector<VkFramebuffer> mFramebuffers;
+    VkImage mStageImage = VK_NULL_HANDLE;
+    VkMemoryRequirements mStageMemoryRequirements;
+    VkDeviceMemory mStageMemory = VK_NULL_HANDLE;
+    VkSubresourceLayout mStageSubresourceLayout;
+
     // For swapchain recreation, old stuff can be refactored to kInflight buffered
     bool mFireRecreateSwapchain = false;
     uint32_t mPreRotationLatency = kPreRotationLatency;
@@ -135,6 +142,9 @@ private:
     std::vector<VkFence> mInflightFences;
 
     // App specific constants
+    static constexpr const char *kRequiredInstanceLayers[1] = {
+            "VK_LAYER_KHRONOS_validation",
+    };
     static constexpr const char* kRequiredInstanceExtensions[2] = {
             "VK_KHR_surface",
             "VK_KHR_android_surface",

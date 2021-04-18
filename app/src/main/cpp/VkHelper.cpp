@@ -23,6 +23,7 @@
 void VkHelper::initializeGlobalApi() {
     GET_PROC(CreateInstance);
     GET_PROC(EnumerateInstanceExtensionProperties);
+    GET_PROC(EnumerateInstanceLayerProperties);
     GET_PROC(EnumerateInstanceVersion);
 }
 

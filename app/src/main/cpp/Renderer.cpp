@@ -84,6 +84,28 @@ void Renderer::drawFrame() {
     };
     ASSERT(mVk.QueueSubmit(mQueue, 1, &submitInfo, mInflightFences[frameIndex]) == VK_SUCCESS);
 
+    ASSERT(mVk.WaitForFences(mDevice, 1, &mInflightFences[frameIndex], VK_TRUE, kTimeout30Sec) ==
+           VK_SUCCESS);
+
+    if (mFrameCount < mImages.size() || (mFrameCount + 1) % kLogInterval == 0) {
+        void* textureData;
+        ASSERT(mVk.MapMemory(mDevice, mStageMemory, 0, mStageMemoryRequirements.size, 0,
+                             &textureData) == VK_SUCCESS);
+
+        auto* data = static_cast<uint32_t*>(textureData);
+        uint32_t r0 = 0;
+        uint32_t r1 = (mImageHeight / 2 - 10) * mStageSubresourceLayout.rowPitch / 4;
+        uint32_t r2 = (mImageHeight / 2 + 10) * mStageSubresourceLayout.rowPitch / 4;
+        uint32_t r3 = (mImageHeight - 1) * mStageSubresourceLayout.rowPitch / 4;
+        ALOGD("READ BACK:\n%X %X\n%X %X\n%X %X\n%X %X",
+              data[r0], data[r0 + mImageWidth - 1],
+              data[r1], data[r1 + mImageWidth - 1],
+              data[r2], data[r2 + mImageWidth - 1],
+              data[r3], data[r3 + mImageWidth - 1]);
+
+        mVk.UnmapMemory(mDevice, mStageMemory);
+    }
+
     const VkPresentInfoKHR presentInfo = {
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .pNext = nullptr,
@@ -114,6 +136,8 @@ void Renderer::drawFrame() {
             std::swap(mImages, mOldImages);
             std::swap(mImageViews, mOldImageViews);
             std::swap(mFramebuffers, mOldFramebuffers);
+            mVk.FreeMemory(mDevice, mStageMemory, nullptr);
+            mVk.DestroyImage(mDevice, mStageImage, nullptr);
 
             mRetireFrame = mFrameCount + kInflight;
 
@@ -229,11 +253,19 @@ void Renderer::destroy() {
 }
 
 /* Private APIs start here */
-static bool hasExtension(const char* extension_name,
+static bool hasLayer(const char* layerName,
+                         const std::vector<VkLayerProperties>& layers) {
+    return std::find_if(layers.cbegin(), layers.cend(),
+                        [layerName](const VkLayerProperties& layer) {
+                            return strcmp(layer.layerName, layerName) == 0;
+                        }) != layers.cend();
+}
+
+static bool hasExtension(const char* extensionName,
                          const std::vector<VkExtensionProperties>& extensions) {
     return std::find_if(extensions.cbegin(), extensions.cend(),
-                        [extension_name](const VkExtensionProperties& extension) {
-                            return strcmp(extension.extensionName, extension_name) == 0;
+                        [extensionName](const VkExtensionProperties& extension) {
+                            return strcmp(extension.extensionName, extensionName) == 0;
                         }) != extensions.cend();
 }
 
@@ -243,6 +275,16 @@ void Renderer::createInstance() {
     uint32_t instanceVersion = 0;
     ASSERT(mVk.EnumerateInstanceVersion(&instanceVersion) == VK_SUCCESS);
     ASSERT(instanceVersion >= VK_MAKE_VERSION(1, 1, 0));
+
+    uint32_t layerCount = 0;
+    ASSERT(mVk.EnumerateInstanceLayerProperties(&layerCount, nullptr) == VK_SUCCESS);
+    std::vector<VkLayerProperties> supportedInstanceLayers(layerCount);
+    ASSERT(mVk.EnumerateInstanceLayerProperties(&layerCount, supportedInstanceLayers.data()) == VK_SUCCESS);
+    std::vector<const char*> enabledInstanceLayers;
+    for (const auto layer : kRequiredInstanceLayers) {
+        ASSERT(hasLayer(layer, supportedInstanceLayers));
+        enabledInstanceLayers.push_back(layer);
+    }
 
     uint32_t extensionCount = 0;
     ASSERT(mVk.EnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr) ==
@@ -272,8 +314,8 @@ void Renderer::createInstance() {
             .pNext = nullptr,
             .flags = 0,
             .pApplicationInfo = &applicationInfo,
-            .enabledLayerCount = 0,
-            .ppEnabledLayerNames = nullptr,
+            .enabledLayerCount = static_cast<uint32_t>(enabledInstanceLayers.size()),
+            .ppEnabledLayerNames = enabledInstanceLayers.data(),
             .enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.size()),
             .ppEnabledExtensionNames = enabledInstanceExtensions.data(),
     };
@@ -405,6 +447,50 @@ void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
         std::swap(mImageWidth, mImageHeight);
     }
 
+    VkImageCreateInfo imageCreateInfo = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .imageType = VK_IMAGE_TYPE_2D,
+            .format = VK_FORMAT_R8G8B8A8_UNORM,
+            .extent =
+                    {
+                            .width = mImageWidth,
+                            .height = mImageHeight,
+                            .depth = 1,
+                    },
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .tiling = VK_IMAGE_TILING_LINEAR,
+            .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+            .queueFamilyIndexCount = 1,
+            .pQueueFamilyIndices = &mQueueFamilyIndex,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+    ASSERT(mVk.CreateImage(mDevice, &imageCreateInfo, nullptr, &mStageImage) == VK_SUCCESS);
+
+    mVk.GetImageMemoryRequirements(mDevice, mStageImage, &mStageMemoryRequirements);
+
+    const uint32_t typeIndex = getMemoryTypeIndex(mStageMemoryRequirements.memoryTypeBits,
+                                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    VkMemoryAllocateInfo memoryAllocateInfo = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .allocationSize = mStageMemoryRequirements.size,
+            .memoryTypeIndex = typeIndex,
+    };
+    ASSERT(mVk.AllocateMemory(mDevice, &memoryAllocateInfo, nullptr, &mStageMemory) == VK_SUCCESS);
+    ASSERT(mVk.BindImageMemory(mDevice, mStageImage, mStageMemory, 0) == VK_SUCCESS);
+
+    const VkImageSubresource imageSubresource = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = 0,
+            .arrayLayer = 0,
+    };
+    mVk.GetImageSubresourceLayout(mDevice, mStageImage, &imageSubresource, &mStageSubresourceLayout);
+
     const VkSwapchainCreateInfoKHR swapchainCreateInfo = {
             .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
             .pNext = nullptr,
@@ -419,7 +505,7 @@ void Renderer::createSwapchain(VkSwapchainKHR oldSwapchain) {
                             .height = mImageHeight,
                     },
             .imageArrayLayers = 1,
-            .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
             .queueFamilyIndexCount = 1,
             .pQueueFamilyIndices = &mQueueFamilyIndex,
@@ -476,18 +562,20 @@ uint32_t Renderer::getMemoryTypeIndex(uint32_t typeBits, VkFlags mask) {
 }
 
 void Renderer::setImageLayout(VkCommandBuffer commandBuffer, VkImage image,
+                              VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask,
                               VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
-                              VkPipelineStageFlags srcStageMask,
-                              VkPipelineStageFlags dstStageMask) {
+                              VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
+                              uint32_t srcQueue = VK_QUEUE_FAMILY_IGNORED,
+                              uint32_t dstQueue = VK_QUEUE_FAMILY_IGNORED) {
     VkImageMemoryBarrier imageMemoryBarrier = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .pNext = nullptr,
-            .srcAccessMask = 0,
-            .dstAccessMask = 0,
+            .srcAccessMask = srcAccessMask,
+            .dstAccessMask = dstAccessMask,
             .oldLayout = oldImageLayout,
             .newLayout = newImageLayout,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .srcQueueFamilyIndex = srcQueue,
+            .dstQueueFamilyIndex = dstQueue,
             .image = image,
             .subresourceRange =
                     {
@@ -498,53 +586,8 @@ void Renderer::setImageLayout(VkCommandBuffer commandBuffer, VkImage image,
                             .layerCount = 1,
                     },
     };
-
-    switch (oldImageLayout) {
-        case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-            imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            break;
-
-        case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-            imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            break;
-
-        case VK_IMAGE_LAYOUT_PREINITIALIZED:
-            imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-            break;
-
-        default:
-            break;
-    }
-
-    switch (newImageLayout) {
-        case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-            imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            break;
-
-        case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-            imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            break;
-
-        case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-            imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            break;
-
-        case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-            imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            break;
-
-        case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-            imageMemoryBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            break;
-
-        default:
-            break;
-    }
-
     mVk.CmdPipelineBarrier(commandBuffer, srcStageMask, dstStageMask, 0, 0, nullptr, 0, nullptr, 1,
                            &imageMemoryBarrier);
-
-    ALOGD("Successfully transferred image layout from %u to %u", oldImageLayout, newImageLayout);
 }
 
 void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
@@ -627,6 +670,11 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
         }
         textureData = (uint8_t*)textureData + subresourceLayout.rowPitch;
     }
+    ALOGD("RAW TEX:\n%X %X\n%X %X",
+          ((uint32_t *)imageData)[0],
+          ((uint32_t *)imageData)[imageWidth - 1],
+          ((uint32_t *)imageData)[imageWidth * (imageHeight - 1)],
+          ((uint32_t *)imageData)[imageWidth * (imageHeight - 1) + imageWidth - 1]);
 
     mVk.UnmapMemory(mDevice, stageMemory);
     stbi_image_free(imageData);
@@ -677,40 +725,53 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
     };
     ASSERT(mVk.BeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) == VK_SUCCESS);
 
-    setImageLayout(commandBuffer, stageImage, VK_IMAGE_LAYOUT_PREINITIALIZED,
-                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
-                   VK_PIPELINE_STAGE_TRANSFER_BIT);
+    setImageLayout(commandBuffer, stageImage,
+                   VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                   VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
     // Transitions image out of UNDEFINED type
-    setImageLayout(commandBuffer, outTexture->image, VK_IMAGE_LAYOUT_UNDEFINED,
-                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT,
-                   VK_PIPELINE_STAGE_TRANSFER_BIT);
+    setImageLayout(commandBuffer, outTexture->image,
+                   0, VK_ACCESS_TRANSFER_WRITE_BIT,
+                   VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
     const VkImageCopy blitInfo = {
-            .srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .srcSubresource.mipLevel = 0,
-            .srcSubresource.baseArrayLayer = 0,
-            .srcSubresource.layerCount = 1,
-            .srcOffset.x = 0,
-            .srcOffset.y = 0,
-            .srcOffset.z = 0,
-            .dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .dstSubresource.mipLevel = 0,
-            .dstSubresource.baseArrayLayer = 0,
-            .dstSubresource.layerCount = 1,
-            .dstOffset.x = 0,
-            .dstOffset.y = 0,
-            .dstOffset.z = 0,
-            .extent.width = imageWidth,
-            .extent.height = imageHeight,
-            .extent.depth = 1,
+            .srcSubresource = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                    },
+            .srcOffset = {
+                    .x = 0,
+                    .y = 0,
+                    .z = 0,
+                    },
+            .dstSubresource = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                    },
+            .dstOffset = {
+                    .x = 0,
+                    .y = 0,
+                    .z = 0,
+                    },
+            .extent = {
+                    .width = imageWidth,
+                    .height = imageHeight,
+                    .depth = 1,
+                    },
     };
     mVk.CmdCopyImage(commandBuffer, stageImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                      outTexture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blitInfo);
 
-    setImageLayout(commandBuffer, outTexture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+    setImageLayout(commandBuffer, outTexture->image,
+                   VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
     ASSERT(mVk.EndCommandBuffer(commandBuffer) == VK_SUCCESS);
 
@@ -723,8 +784,8 @@ void Renderer::loadTextureFromFile(const char* filePath, Texture* outTexture) {
     ASSERT(mVk.CreateFence(mDevice, &fenceCreateInfo, nullptr, &fence) == VK_SUCCESS);
 
     const VkSubmitInfo submitInfo = {
-            .pNext = nullptr,
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = nullptr,
             .waitSemaphoreCount = 0,
             .pWaitSemaphores = nullptr,
             .pWaitDstStageMask = nullptr,
@@ -901,7 +962,7 @@ void Renderer::createRenderPass() {
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     };
     const VkAttachmentReference attachmentReference = {
             .attachment = 0,
@@ -1271,11 +1332,16 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     ASSERT(mVk.BeginCommandBuffer(mCommandBuffers[frameIndex], &commandBufferBeginInfo) ==
            VK_SUCCESS);
 
+    setImageLayout(mCommandBuffers[frameIndex], mImages[imageIndex],
+                   0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                   VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                   VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                   VK_QUEUE_FAMILY_FOREIGN_EXT, mQueueFamilyIndex);
+
     const VkClearValue clearVals = {
-            .color.float32[0] = 0.5F,
-            .color.float32[1] = 0.5F,
-            .color.float32[2] = 0.5F,
-            .color.float32[3] = 1.0F,
+            .color = {
+                    .float32 = { 0.5F, 0.5F, 0.5F, 1.0F },
+                    },
     };
     const VkRenderPassBeginInfo renderPassBeginInfo = {
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -1369,6 +1435,64 @@ void Renderer::recordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex) {
     mVk.CmdDraw(mCommandBuffers[frameIndex], 4, 1, 0, 0);
 
     mVk.CmdEndRenderPass(mCommandBuffers[frameIndex]);
+
+    setImageLayout(mCommandBuffers[frameIndex], mImages[imageIndex],
+                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+    setImageLayout(mCommandBuffers[frameIndex], mStageImage,
+                   VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                   VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+    const VkImageCopy blitInfo = {
+            .srcSubresource = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+            },
+            .srcOffset = {
+                    .x = 0,
+                    .y = 0,
+                    .z = 0,
+            },
+            .dstSubresource = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+            },
+            .dstOffset = {
+                    .x = 0,
+                    .y = 0,
+                    .z = 0,
+            },
+            .extent = {
+                    .width = mImageWidth,
+                    .height = mImageHeight,
+                    .depth = 1,
+            },
+    };
+    mVk.CmdCopyImage(mCommandBuffers[frameIndex], mImages[imageIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                     mStageImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blitInfo);
+
+    setImageLayout(mCommandBuffers[frameIndex], mStageImage,
+                   VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_HOST_WRITE_BIT,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT);
+
+    setImageLayout(mCommandBuffers[frameIndex], mImages[imageIndex],
+                   VK_ACCESS_TRANSFER_READ_BIT, 0,
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+
+    setImageLayout(mCommandBuffers[frameIndex], mImages[imageIndex],
+                   0, 0,
+                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_GENERAL,
+                   VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                   mQueueFamilyIndex, VK_QUEUE_FAMILY_FOREIGN_EXT);
 
     ASSERT(mVk.EndCommandBuffer(mCommandBuffers[frameIndex]) == VK_SUCCESS);
 }
